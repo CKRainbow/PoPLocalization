@@ -59,7 +59,7 @@ jobs:
 
     - name: Download Game Data
       if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
-      run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft?download'
+      run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft/info/zip/PortalsOfPhereon_Data'
 
     - name: Extract Game Data
       run: |
@@ -68,6 +68,7 @@ jobs:
         mkdir -p Managed
         mv PortalsOfPhereon_Data/Managed/* ./Managed/
         rm -rf PortalsOfPhereon_Data
+        ls -la
 
     - name: Cache Decompiled Code
       uses: actions/cache@v4
@@ -82,7 +83,13 @@ jobs:
         mkdir -p decompiled
         cd decompiled
         ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
+
+        cat Assemly-CSharp.csproj
+
         cd ..
+
+        ls -la
+
         python decompile_fix.py
 
     - name: Install Python dependencies
