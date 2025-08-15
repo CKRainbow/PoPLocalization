@@ -115,18 +115,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Prepare Release Files
-      shell: bash
+    - name: Package Release Artifacts
       run: |
-        mkdir -p PortalsOfPhereon_Data/Managed
-        cp output_assets/data.unity3d PortalsOfPhereon_Data/data.unity3d
-        cp replaced/bin/Release/net40/Assembly-CSharp.dll PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
-
-    - name: Zip Release Files
-      uses: vimtor/action-zip@v1.2
-      with:
-        files: PortalsOfPhereon_Data
-        dest: PortalsOfPhereon_Data.zip
+        New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
+        Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
+        Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        Compress-Archive -Path PortalsOfPhereon_Data -DestinationPath PortalsOfPhereon_Data.zip
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
