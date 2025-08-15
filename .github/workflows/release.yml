@@ -82,11 +82,7 @@ jobs:
         cd decompiled
         ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
 
-        cat Assembly-CSharp.csproj
-
         cd ..
-
-        ls -la
 
         python decompile_fix.py
 
@@ -94,7 +90,13 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Run pipeline script
-      run: bash ./pipeline.sh
+      run: |
+        ls -la
+        ls -la decompiled
+        cat decompiled/Assembly-CSharp.csproj
+        ls -la Managed
+
+        bash ./pipeline.sh
       env:
           PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
 
