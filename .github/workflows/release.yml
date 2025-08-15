@@ -82,7 +82,7 @@ jobs:
         cd decompiled
         ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
 
-        cat Assemly-CSharp.csproj
+        cat Assembly-CSharp.csproj
 
         cd ..
 
