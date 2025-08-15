@@ -1,0 +1,24 @@
+{
+  "source": {
+    "font_assets": {
+      "path_id": [6]
+    },
+    "textures": {
+      "path_id": [3],
+      "name": ["LiberationSans_cjk SDF Atlas"]
+    }
+  },
+  "target": {
+    "font_assets":  {
+      "path_id": [82]
+    },
+    "textures":  {
+      "path_id": [43],
+      "name": ["LiberationSans SDF Atlas"]
+    },
+    "materials": {
+      "path_id": [2],
+      "name": ["LiberationSans SDF - Drop Shadow"]
+    }
+  }
+}

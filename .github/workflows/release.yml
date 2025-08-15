@@ -1,0 +1,72 @@
+name: Create Pre-release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create a release
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x' # Or your specific .NET version
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10' # Or your specific Python version
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/DllTranslation.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Cache Pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Cache External Assets
+      uses: actions/cache@v4
+      id: cache-assets
+      with:
+        path: |
+          ./data.unity3D
+          ./Managed
+          ./decompiled
+          ./TMPfont
+        key: ${{ runner.os }}-assets-v1 # Using a static key, change if assets update
+
+    - name: Install Python dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run pipeline script
+      run: bash ./pipeline.sh
+      env:
+          PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
+
+    - name: Create Release and Upload Artifacts
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          replaced/bin/Release/CSharp-Assembly.dll
+          output_assets/data.unity3d
+        tag_name: build-${{ github.run_number }}
+        name: "Build ${{ github.run_number }}"
+        body: "Automated pre-release build."
+        prerelease: true
