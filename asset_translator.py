@@ -207,18 +207,13 @@ def font_asset_adoption(src_typetree: Dict, target_typetree: Dict) -> Dict:
 
 def core_change_font(
     target_env: UnityPy.Environment,
-    new_font_asset_path: str,
+    new_font_env: UnityPy.Environment,
     config: Dict,
-    generator: TypeTreeGenerator,
 ) -> UnityPy.Environment:
     """
     Core logic for changing fonts and related assets based on a config file.
     Operates on a loaded UnityPy Environment.
     """
-    # 1. Load the asset containing the new font(s) and texture(s)
-    new_font_env = UnityPy.load(new_font_asset_path)
-    new_font_env.typetree_generator = generator
-
     def build_maps(env: UnityPy.Environment, config: Dict):
         font_asset_config = config.get("font_assets", None)
         texture_config = config.get("textures", None)
@@ -337,12 +332,13 @@ def change_font(args):
         # Generator for the new font asset
         new_font_generator = TypeTreeGenerator(args.unity_version)
         new_font_generator.load_local_dll_folder(args.new_font_dll_folder)
+        new_font_env = UnityPy.load(args.new_font_asset)
+        new_font_env.typetree_generator = new_font_generator
 
         modified_env = core_change_font(
             target_env,
-            args.new_font_asset,
+            new_font_env,
             config_data,
-            new_font_generator
         )
 
         with open(args.output, "wb") as f:
@@ -465,19 +461,20 @@ def pipeline(args):
         # Create a dedicated generator for the new font asset
         new_font_generator = TypeTreeGenerator(args.unity_version)
         new_font_generator.load_local_dll_folder(args.new_font_dll_folder)
+        new_font_env = UnityPy.load(args.new_font_asset)
+        new_font_env.typetree_generator = new_font_generator
 
         final_env = core_change_font(
             modified_env,
-            args.new_font_asset,
-            font_config_data,
-            new_font_generator
+            new_font_env,
+            font_config_data
         )
 
         # === Final Step: Save to File ===
         print("\n--- [Final] Saving all changes to output file ---")
         os.makedirs(os.path.dirname(args.output_asset), exist_ok=True)
         with open(args.output_asset, "wb") as f:
-            f.write(final_env.file.save())
+            f.write(final_env.file.save(packer="lz4"))
 
         print(f"\n✅ Pipeline finished successfully! Final asset saved to '{args.output_asset}'")
 
@@ -509,7 +506,7 @@ def apply(args):
         modified_env = core_apply(env, args.trans)
 
         with open(args.output, "wb") as f:
-            f.write(modified_env.file.save())
+            f.write(modified_env.files.save(packer="lz4"))
         
         print(f"Successfully saved applied translations to '{args.output}'")
     except Exception as e:
