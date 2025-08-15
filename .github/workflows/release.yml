@@ -116,7 +116,7 @@ jobs:
       run: |
         mkdir -p PortalsOfPhereon_Data/Managed
         cp output_assets/data.unity3d PortalsOfPhereon_Data/data.unity3d
-        cp replaced/bin/Release/Assembly-CSharp.dll PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        cp replaced/bin/Release/net40/Assembly-CSharp.dll PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
         zip -r PortalsOfPhereon_Data.zip PortalsOfPhereon_Data
 
     - name: Create Release and Upload Artifacts
