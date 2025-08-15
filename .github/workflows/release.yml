@@ -63,6 +63,7 @@ jobs:
       run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft?download'
 
     - name: Extract Game Data
+      shell: bash
       run: |
         mkdir -p Managed
         unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
@@ -78,6 +79,7 @@ jobs:
 
     - name: Decompile and Fix
       if: steps.cache-decompiled.outputs.cache-hit != 'true'
+      shell: bash
       run: |
         mkdir -p decompiled
         cd decompiled
@@ -91,8 +93,9 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Run pipeline script
+      shell: bash
       run: |
-        ls 
+        ls
         ls decompiled
         cat decompiled/Assembly-CSharp.csproj
         ls Managed
@@ -113,6 +116,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Package Release Artifacts
+      shell: bash
       run: |
         mkdir -p PortalsOfPhereon_Data/Managed
         cp output_assets/data.unity3d PortalsOfPhereon_Data/data.unity3d
