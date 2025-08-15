@@ -68,53 +68,56 @@ jobs:
         unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
         unzip -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/Managed/*" -d Managed/
 
-    - name: Cache Decompiled Code
-      uses: actions/cache@v4
-      id: cache-decompiled
-      with:
-        path: ./decompiled
-        key: ${{ runner.os }}-decompiled-${{ hashFiles('./Managed/Assembly-CSharp.dll') }}
-
-    - name: Decompile and Fix
-      if: steps.cache-decompiled.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p decompiled
-        cd decompiled
-        ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
-
-        cat Assemly-CSharp.csproj
-
-        cd ..
-
         ls -la
+        ls -la Managed
 
-        python decompile_fix.py
+    # - name: Cache Decompiled Code
+    #   uses: actions/cache@v4
+    #   id: cache-decompiled
+    #   with:
+    #     path: ./decompiled
+    #     key: ${{ runner.os }}-decompiled-${{ hashFiles('./Managed/Assembly-CSharp.dll') }}
 
-    - name: Install Python dependencies
-      run: pip install -r requirements.txt
+    # - name: Decompile and Fix
+    #   if: steps.cache-decompiled.outputs.cache-hit != 'true'
+    #   run: |
+    #     mkdir -p decompiled
+    #     cd decompiled
+    #     ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
 
-    - name: Run pipeline script
-      run: bash ./pipeline.sh
-      env:
-          PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
+    #     cat Assemly-CSharp.csproj
 
-    - name: Delete older releases
-      uses: dev-drprasad/delete-older-releases@v0.3.4
-      with:
-        keep_latest: 5
-        delete_tags: true
-        delete_prerelease_only: true
-        delete_tag_pattern: 'build-.*'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #     cd ..
 
-    - name: Create Release and Upload Artifacts
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          replaced/bin/Release/Assembly-CSharp.dll
-          output_assets/data.unity3d
-        tag_name: build-${{ github.run_number }}
-        name: "Build ${{ github.run_number }}"
-        body: "Automated pre-release build."
-        prerelease: true
+    #     ls -la
+
+    #     python decompile_fix.py
+
+    # - name: Install Python dependencies
+    #   run: pip install -r requirements.txt
+
+    # - name: Run pipeline script
+    #   run: bash ./pipeline.sh
+    #   env:
+    #       PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
+
+    # - name: Delete older releases
+    #   uses: dev-drprasad/delete-older-releases@v0.3.4
+    #   with:
+    #     keep_latest: 5
+    #     delete_tags: true
+    #     delete_prerelease_only: true
+    #     delete_tag_pattern: 'build-.*'
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # - name: Create Release and Upload Artifacts
+    #   uses: softprops/action-gh-release@v2
+    #   with:
+    #     files: |
+    #       replaced/bin/Release/Assembly-CSharp.dll
+    #       output_assets/data.unity3d
+    #     tag_name: build-${{ github.run_number }}
+    #     name: "Build ${{ github.run_number }}"
+    #     body: "Automated pre-release build."
+    #     prerelease: true
