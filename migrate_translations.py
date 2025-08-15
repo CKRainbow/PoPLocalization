@@ -3,15 +3,6 @@ import json
 import os
 from typing import Dict
 
-def parse_old_key(key_str: str):
-    """Parses a key like 'TextMeshProUGUI_42' into ('TextMeshProUGUI', '42')."""
-    if not key_str:
-        return None, None
-    parts = key_str.rsplit('_', 1)
-    if len(parts) == 2 and parts[1].isdigit():
-        return parts[0], parts[1]
-    return None, None
-
 def parse_context(context_str: str) -> Dict[str, str]:
     """Parses a context string into a dictionary."""
     context_info = {}
@@ -38,7 +29,7 @@ def migrate(args):
         print(f"Error: New-format JSON file not found at '{args.new_json}'")
         return
 
-    # 2. Load old translation data into a lookup map based on Script and PathID
+    # 2. Load old translation data into a lookup map based on Script, PathID and original text
     print(f"Loading old translations from '{args.old_json}'...")
     with open(args.old_json, "r", encoding="utf-8") as f:
         old_data = json.load(f)
@@ -47,22 +38,56 @@ def migrate(args):
     
     translation_lookup = {}
     for entry in old_data:
-        script_name, path_id = parse_old_key(entry.get("key"))
-        if script_name and path_id:
-            composite_key = f"{script_name}:{path_id}"
-            # check if composite_key already exists
+        context_info = parse_context(entry.get("context"))
+        script_name = context_info.get("Script")
+        path_id = context_info.get("PathID")
+        original_text = entry.get("original")
+
+        if script_name and path_id and original_text:
+            composite_key = f"{script_name}:{path_id}:{original_text}"
             if composite_key in translation_lookup:
-                print(f"Warning: Duplicate key found: {composite_key}")
+                print(f"Warning: Duplicate key found in old file: {composite_key}")
             else:
                 translation_lookup[composite_key] = entry
     
-    print(f"Loaded {len(translation_lookup)} translations into the Script:PathID lookup map.")
+    print(f"Loaded {len(translation_lookup)} translations into the lookup map.")
 
     # 3. Load the new-format JSON file
     print(f"Loading new-format entries from '{args.new_json}'...")
     with open(args.new_json, "r", encoding="utf-8") as f:
         new_data = json.load(f)
     print(f"Loaded {len(new_data)} new-format entries.")
+
+    # 4. Check for duplicates in the new file
+    print("Checking for duplicates in new file (same PathID, Script, GameObjectID)...")
+    seen_entries = {}
+    duplicates_found = False
+    for entry in new_data:
+        context_info = parse_context(entry.get("context"))
+        path_id = context_info.get("PathID")
+        script_name = context_info.get("Script")
+        game_object_id = context_info.get("GameObjectID")
+
+        if path_id and script_name and game_object_id:
+            duplicate_key = f"{script_name}:{path_id}:{game_object_id}"
+            if duplicate_key in seen_entries:
+                if not duplicates_found:
+                    print("Warning: Found entries with the same PathID, Script, and GameObjectID:")
+                    duplicates_found = True
+                
+                # Print the first occurrence if it hasn't been printed yet
+                if seen_entries[duplicate_key] is not None:
+                    print(f"- Key: {duplicate_key}")
+                    print(f"  - Original 1: '{seen_entries[duplicate_key]}'")
+                    seen_entries[duplicate_key] = None # Mark as printed
+                
+                print(f"  - Original 2: '{entry.get('original')}'")
+            else:
+                seen_entries[duplicate_key] = entry.get('original')
+
+    if not duplicates_found:
+        print("No duplicates found.")
+
 
     merged_keys = set()
     unmatched_new_keys = []
@@ -73,9 +98,10 @@ def migrate(args):
         context_info = parse_context(entry.get("context"))
         script_name = context_info.get("Script")
         path_id = context_info.get("PathID")
+        original_text = entry.get("original")
 
-        if script_name and path_id:
-            composite_key = f"{script_name}:{path_id}"
+        if script_name and path_id and original_text:
+            composite_key = f"{script_name}:{path_id}:{original_text}"
             if composite_key in translation_lookup:
                 old_entry = translation_lookup[composite_key]
                 

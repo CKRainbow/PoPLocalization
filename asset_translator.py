@@ -43,9 +43,10 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
                 data = obj.read_typetree()
                 if "m_text" in data and data["m_text"]:
                     original_text = data["m_text"]
-                    key_source = f"{script.m_Name}:{obj.path_id}:{original_text}"
+                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                    key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
                     key = generate_hash(key_source)
-                    context = f"PathID: {obj.path_id}\nScript: {script.m_Name}"
+                    context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
 
                     entry = ParatranzEntry(
                         key=key,
@@ -368,8 +369,9 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
         context = entry["context"]
         path_id = int(re.search(r"PathID:\s*(\d+)", context).group(1))
         script = re.search(r"Script:\s*(.+)", context).group(1)
+        gameObject_path_id = int(re.search(r"GameObjectID:\s*(\d+)", context).group(1))
 
-        translated_entry_map[(path_id, script)] = entry
+        translated_entry_map[(path_id, script, gameObject_path_id)] = entry
         translated_entry_path_id_set.add(path_id)
 
     if not translated_entry_map:
@@ -386,10 +388,11 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
                 monobehaviour = cast(MonoBehaviour, obj.parse_as_object(node, check_read=False))
                 script = monobehaviour.m_Script.deref_parse_as_object()
                 script_name = script.m_Name
-                if (obj.path_id, script_name) in translated_entry_map:
-                    data = obj.read_typetree()
+                data = obj.read_typetree()
+                gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                if (obj.path_id, script_name, gameObject_path_id) in translated_entry_map:
                     if "m_text" in data and data["m_text"]:
-                        data["m_text"] = translated_entry_map[(obj.path_id, script_name)]["translation"]
+                        data["m_text"] = translated_entry_map[(obj.path_id, script_name, gameObject_path_id)]["translation"]
                         obj.save_typetree(data)
                         modified_count += 1
             except Exception as e:
