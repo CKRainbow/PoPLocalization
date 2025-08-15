@@ -92,10 +92,10 @@ jobs:
 
     - name: Run pipeline script
       run: |
-        ls -la
-        ls -la decompiled
+        ls 
+        ls decompiled
         cat decompiled/Assembly-CSharp.csproj
-        ls -la Managed
+        ls Managed
 
         bash ./pipeline.sh
       env:
