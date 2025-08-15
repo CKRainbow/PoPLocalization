@@ -7,7 +7,7 @@ dotnet run \
     --new-paratranz-dir new \
     --replaced-output replaced \
     --paratranz-project-id 15832 \
-    --paratranz-token f4a06da14ee3fe6bf5b43145418e07c7
+    --paratranz-token "$PARATRANZ_TOKEN"
 
 {
     python asset_translator.py pipeline \
