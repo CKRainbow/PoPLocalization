@@ -98,13 +98,18 @@ public class TranslationUpdater
 
                 if (bestMatch != null)
                 {
+                    var stage = bestMatch.Stage;
+                    if (bestMatch.Stage != 0)
+                    {
+                        stage = 2;
+                    }
                     matchedEntries.Add(
                         bestMatch with
                         {
                             Key = newEntry.Hash, // 使用新的强哈希作为Key
                             Original = newEntry.Text,
                             Context = newEntry.GetContext(relativePath),
-                            Stage = 10 // 标记为模糊匹配
+                            Stage = stage // 标记为模糊匹配
                         }
                     );
                     usedOldKeys.Add(bestMatch.Key);

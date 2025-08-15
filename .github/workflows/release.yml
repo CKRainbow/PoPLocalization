@@ -108,12 +108,17 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Package Release Artifacts
+      run: |
+        mkdir -p PortalsOfPhereon_Data/Managed
+        cp output_assets/data.unity3d PortalsOfPhereon_Data/data.unity3d
+        cp replaced/bin/Release/Assembly-CSharp.dll PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        zip -r PortalsOfPhereon_Data.zip PortalsOfPhereon_Data
+
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          replaced/bin/Release/Assembly-CSharp.dll
-          output_assets/data.unity3d
+        files: PortalsOfPhereon_Data.zip
         tag_name: build-${{ github.run_number }}
         name: "Build ${{ github.run_number }}"
         body: "Automated pre-release build."
