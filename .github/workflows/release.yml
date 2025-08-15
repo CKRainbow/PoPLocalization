@@ -9,7 +9,8 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to create a release
+      contents: write
+      pull-requests: write # Required to delete releases and tags
 
     steps:
     - name: Checkout repository
@@ -99,6 +100,16 @@ jobs:
       run: bash ./pipeline.sh
       env:
           PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
+
+    - name: Delete older releases
+      uses: dev-drpr/delete-older-releases@v0.3.0
+      with:
+        keep_latest: 5
+        delete_tags: true
+        delete_prerelease_only: true
+        filter_tag: 'build-.*'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
