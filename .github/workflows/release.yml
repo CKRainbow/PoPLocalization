@@ -60,16 +60,13 @@ jobs:
 
     - name: Download Game Data
       if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
-      run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft/info/zip/PortalsOfPhereon_Data'
+      run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft?download'
 
     - name: Extract Game Data
       run: |
-        unzip -o PortalsOfPhereon_Data.zip
-        mv PortalsOfPhereon_Data/data.unity3d .
         mkdir -p Managed
-        mv PortalsOfPhereon_Data/Managed/* ./Managed/
-        rm -rf PortalsOfPhereon_Data
-        ls -la
+        unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
+        unzip -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/Managed/*" -d Managed/
 
     - name: Cache Decompiled Code
       uses: actions/cache@v4
