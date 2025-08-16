@@ -138,7 +138,7 @@ jobs:
         Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
         Copy-Item -Path readme.txt -Destination ./readme.txt
-        Compress-Archive -Path PortalsOfPhereon_Data/* -DestinationPath PortalsOfPhereonChineseLocalization.zip
+        Compress-Archive -Path PortalsOfPhereon_Data/*,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization.zip
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
