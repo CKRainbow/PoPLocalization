@@ -4,6 +4,8 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  schedule: # Runs every Tuesday and Friday at 12:00 PM UTC
+    - cron: '0 12 * * 2,5'
 
 jobs:
   build-and-release:
@@ -51,16 +53,25 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
+    - name: Get Latest Game Version
+      id: game_version
+      shell: pwsh
+      run: |
+        $latest = Get-Content -Path versions.json -Raw | ConvertFrom-Json
+        echo "VERSION=$($latest.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "URL=$($latest.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "CACHE_KEY_SUFFIX=$($latest.cache_key_suffix)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
     - name: Cache Game Data Zip
       uses: actions/cache@v4
       id: cache-gamedata-zip
       with:
         path: PortalsOfPhereon_Data.zip
-        key: gamedata-zip-P2aSNnft-v1
+        key: gamedata-zip-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
 
     - name: Download Game Data
       if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
-      run: curl -L -o PortalsOfPhereon_Data.zip 'https://pixeldrain.com/api/file/P2aSNnft?download'
+      run: curl -L -o PortalsOfPhereon_Data.zip '${{ steps.game_version.outputs.URL }}'
 
     - name: Extract Game Data
       shell: bash
@@ -74,7 +85,7 @@ jobs:
       id: cache-decompiled
       with:
         path: ./decompiled
-        key: ${{ runner.os }}-decompiled-P2aSNnft-v1
+        key: ${{ runner.os }}-decompiled-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
 
     - name: Decompile and Fix
       if: steps.cache-decompiled.outputs.cache-hit != 'true'
@@ -114,18 +125,26 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Prepare Release Notes
+      shell: pwsh
+      run: |
+        $readmeContent = Get-Content -Path readme.txt -Raw
+        $readmeContent = $readmeContent -replace "{GAME_VERSION}", "${{ steps.game_version.outputs.VERSION }}"
+        Set-Content -Path readme.txt -Value $readmeContent
+
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
         Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
-        Compress-Archive -Path PortalsOfPhereon_Data -DestinationPath PortalsOfPhereonChineseLocalization.zip
+        Copy-Item -Path readme.txt -Destination ./readme.txt
+        Compress-Archive -Path PortalsOfPhereon_Data/* -DestinationPath PortalsOfPhereonChineseLocalization.zip
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
       with:
         files: PortalsOfPhereonChineseLocalization.zip
         tag_name: build-${{ github.run_number }}
-        name: "Build ${{ github.run_number }}"
-        body: "Automated pre-release build."
+        name: "Build ${{ github.run_number }} for Game Version ${{ steps.game_version.outputs.VERSION }}"
+        body: "自动化预发布构建。此汉化补丁适用于游戏版本 **${{ steps.game_version.outputs.VERSION }}**。"
         prerelease: true
