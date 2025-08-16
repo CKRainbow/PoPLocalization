@@ -68,7 +68,6 @@ jobs:
         mkdir -p Managed
         unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
         unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/Managed/*" -d Managed/
-        rm PortalsOfPhereon_Data.zip
 
     - name: Cache Decompiled Code
       uses: actions/cache@v4

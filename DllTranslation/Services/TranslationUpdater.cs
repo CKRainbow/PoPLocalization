@@ -171,6 +171,7 @@ public class TranslationUpdater
         );
 
         // 计算过时条目
+        var completelyObsoleteFiles = new List<string>();
         foreach (var oldFile in oldTranslations)
         {
             var relativePath = oldFile.Key;
@@ -181,6 +182,7 @@ public class TranslationUpdater
                 var obsolete = oldFileEntries
                     .Where(kvp => !usedKeys.Contains(kvp.Key))
                     .Select(kvp => kvp.Value)
+                    .Where(e => !string.IsNullOrEmpty(e.Translation) && e.Stage != 0)
                     .ToList();
                 if (obsolete.Any())
                 {
@@ -189,7 +191,14 @@ public class TranslationUpdater
             }
             else // 如果新数据里完全没有这个文件，那整个旧文件都是过时的
             {
-                obsoleteEntries[relativePath] = oldFileEntries.Values.ToList();
+                var obsolete = oldFileEntries
+                    .Values.Where(e => !string.IsNullOrEmpty(e.Translation) && e.Stage != 0)
+                    .ToList();
+                if (obsolete.Any())
+                {
+                    obsoleteEntries[relativePath] = obsolete;
+                }
+                completelyObsoleteFiles.Add(relativePath);
             }
         }
 
@@ -238,6 +247,15 @@ public class TranslationUpdater
                     JsonSerializer.Serialize(entry.Value, jsonOptions),
                     cancellationToken
                 );
+            }
+        }
+
+        if (completelyObsoleteFiles.Any())
+        {
+            Console.WriteLine($"ℹ️ {completelyObsoleteFiles.Count} 个旧文件在新提取中已不存在:");
+            foreach (var file in completelyObsoleteFiles)
+            {
+                Console.WriteLine($"  - {file}");
             }
         }
 

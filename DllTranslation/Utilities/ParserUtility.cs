@@ -99,47 +99,81 @@ public static class ParserUtility
                             return typeInfo?.SpecialType == SpecialType.System_String;
                         });
 
-                    var statements = stringExpressions
-                        .Select(
-                            e =>
-                                (SyntaxNode?)e.FirstAncestorOrSelf<StatementSyntax>()
-                                ?? e.FirstAncestorOrSelf<MemberDeclarationSyntax>()
-                        )
-                        .Where(s => s is not null)
-                        .Distinct()
-                        .Select(s =>
+                    var candidateNodes = stringExpressions
+                        .Select(e =>
                         {
-                            var text = s!.ToFullString().Trim();
+                            var statement = e.FirstAncestorOrSelf<StatementSyntax>();
+                            if (statement != null)
+                                return (SyntaxNode)statement;
+
+                            var member = e.FirstAncestorOrSelf<MemberDeclarationSyntax>();
+                            if (
+                                member is FieldDeclarationSyntax
+                                || member is PropertyDeclarationSyntax
+                            )
+                                return member;
+
+                            return null;
+                        })
+                        .Where(s => s is not null)
+                        .Distinct();
+
+                    var nodesByScope = candidateNodes.GroupBy(
+                        node => node.FirstAncestorOrSelf<MemberDeclarationSyntax>()
+                    );
+
+                    var statements = new List<StatementEntry>();
+
+                    foreach (var group in nodesByScope)
+                    {
+                        var scopeNode = group.Key;
+                        if (scopeNode is null)
+                            continue;
+
+                        var memberName = scopeNode switch
+                        {
+                            MethodDeclarationSyntax m => m.Identifier.ValueText,
+                            ConstructorDeclarationSyntax c => c.Identifier.ValueText,
+                            DestructorDeclarationSyntax d => d.Identifier.ValueText,
+                            PropertyDeclarationSyntax p => p.Identifier.ValueText,
+                            FieldDeclarationSyntax f
+                                => string.Join(
+                                    ", ",
+                                    f.Declaration.Variables.Select(v => v.Identifier.ValueText)
+                                ),
+                            _ => "GlobalScope"
+                        };
+
+                        var candidateNodesInScope = group;
+
+                        var topLevelNodesInScope = candidateNodesInScope.Where(
+                            node =>
+                                !candidateNodesInScope.Any(
+                                    other => node != other && node.Ancestors().Contains(other)
+                                )
+                        );
+
+                        foreach (var s in topLevelNodesInScope)
+                        {
+                            var text = s.ToFullString().Trim();
                             var hash = HashUtility.ComputePositionAwareSha256Hash(
                                 text,
                                 s.Span.Start
                             );
-                            var memberNode = s.FirstAncestorOrSelf<MemberDeclarationSyntax>();
-                            var memberName = memberNode switch
-                            {
-                                MethodDeclarationSyntax m => m.Identifier.ValueText,
-                                ConstructorDeclarationSyntax c => c.Identifier.ValueText,
-                                DestructorDeclarationSyntax d => d.Identifier.ValueText,
-                                PropertyDeclarationSyntax p => p.Identifier.ValueText,
-                                FieldDeclarationSyntax f
-                                    => string.Join(
-                                        ", ",
-                                        f.Declaration.Variables.Select(v => v.Identifier.ValueText)
-                                    ),
-                                _ => "GlobalScope"
-                            };
                             var startLine =
                                 s.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-                            return new StatementEntry(
-                                text,
-                                hash,
-                                s.Span.Start,
-                                s.Span.Length,
-                                memberName,
-                                startLine
+                            statements.Add(
+                                new StatementEntry(
+                                    text,
+                                    hash,
+                                    s.Span.Start,
+                                    s.Span.Length,
+                                    memberName,
+                                    startLine
+                                )
                             );
-                        })
-                        .ToList();
+                        }
+                    }
 
                     if (statements.Any())
                     {
