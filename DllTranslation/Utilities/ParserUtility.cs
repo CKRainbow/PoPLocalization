@@ -100,22 +100,32 @@ public static class ParserUtility
                         });
 
                     var statements = stringExpressions
-                        .Select(e => e.FirstAncestorOrSelf<StatementSyntax>())
-                        .Where(s => s != null)
+                        .Select(
+                            e =>
+                                (SyntaxNode?)e.FirstAncestorOrSelf<StatementSyntax>()
+                                ?? e.FirstAncestorOrSelf<MemberDeclarationSyntax>()
+                        )
+                        .Where(s => s is not null)
                         .Distinct()
                         .Select(s =>
                         {
-                            var text = s.ToFullString().Trim();
+                            var text = s!.ToFullString().Trim();
                             var hash = HashUtility.ComputePositionAwareSha256Hash(
                                 text,
                                 s.Span.Start
                             );
-                            var methodNode = s.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>();
-                            var methodName = methodNode switch
+                            var memberNode = s.FirstAncestorOrSelf<MemberDeclarationSyntax>();
+                            var memberName = memberNode switch
                             {
                                 MethodDeclarationSyntax m => m.Identifier.ValueText,
                                 ConstructorDeclarationSyntax c => c.Identifier.ValueText,
                                 DestructorDeclarationSyntax d => d.Identifier.ValueText,
+                                PropertyDeclarationSyntax p => p.Identifier.ValueText,
+                                FieldDeclarationSyntax f
+                                    => string.Join(
+                                        ", ",
+                                        f.Declaration.Variables.Select(v => v.Identifier.ValueText)
+                                    ),
                                 _ => "GlobalScope"
                             };
                             var startLine =
@@ -125,7 +135,7 @@ public static class ParserUtility
                                 hash,
                                 s.Span.Start,
                                 s.Span.Length,
-                                methodName,
+                                memberName,
                                 startLine
                             );
                         })
@@ -145,7 +155,7 @@ public static class ParserUtility
 
         if (cancellationToken.IsCancellationRequested)
             return null;
-        Console.WriteLine("✅ 语义分析完成。");
+        Console.WriteLine("✅ 语义分析完成，共找到字符串语句：" + allStringStatements.Sum(kvp => kvp.Value.Count));
 
         return allStringStatements;
     }

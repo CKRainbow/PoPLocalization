@@ -1,8 +1,9 @@
+set -e
+
 dotnet run \
     --project DllTranslation pipeline \
     --dir decompiled \
     --output translations \
-    --literals-only \
     --paratranz-dir old \
     --new-paratranz-dir new \
     --replaced-output replaced \
@@ -25,6 +26,7 @@ dotnet run \
 
 {
     cd replaced
+    rm -f decompiled.sln
     dotnet build -c "Release"
 }&
 

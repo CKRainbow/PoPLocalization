@@ -83,6 +83,7 @@ class Program
         updateCommand.Options.Add(oldTransDirOption);
         updateCommand.Options.Add(newSrcDirOption);
         updateCommand.Options.Add(updatedTransDirOption);
+        updateCommand.Options.Add(literalsOnlyOption);
 
         updateCommand.SetAction(
             (result, cancellationToken) =>
@@ -90,11 +91,12 @@ class Program
                 var oldTransDir = result.GetValue(oldTransDirOption)!;
                 var newSrcDir = result.GetValue(newSrcDirOption)!;
                 var updatedTransDir = result.GetValue(updatedTransDirOption)!;
+                var literalsOnly = result.GetValue(literalsOnlyOption)!;
                 return TranslationUpdater.UpdateTranslationsCommandAsync(
                     oldTransDir,
                     newSrcDir,
                     updatedTransDir,
-                    new CsEntryLoader(false),
+                    new CsEntryLoader(literalsOnly),
                     "cs",
                     cancellationToken
                 );
