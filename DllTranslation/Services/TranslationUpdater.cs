@@ -183,6 +183,13 @@ public class TranslationUpdater
                     .Where(kvp => !usedKeys.Contains(kvp.Key))
                     .Select(kvp => kvp.Value)
                     .Where(e => !string.IsNullOrEmpty(e.Translation) && e.Stage != 0)
+                    .Select(
+                        kvp =>
+                            kvp with
+                            {
+                                Stage = 9, // Locked
+                            }
+                    )
                     .ToList();
                 if (obsolete.Any())
                 {
