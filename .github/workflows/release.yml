@@ -105,11 +105,6 @@ jobs:
     - name: Run pipeline script
       shell: bash
       run: |
-        ls
-        ls decompiled
-        cat decompiled/Assembly-CSharp.csproj
-        ls Managed
-
         bash ./pipeline.sh
       env:
           PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
