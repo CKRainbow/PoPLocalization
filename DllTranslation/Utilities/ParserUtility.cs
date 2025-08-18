@@ -11,14 +11,6 @@ namespace DllTranslation.Utilities;
 
 public static class ParserUtility
 {
-    private static readonly HashSet<string> ClassesForConstructorExtraction =
-        new()
-        {
-            // 在这里添加需要提取构造函数的类名
-            // 例如: "Passive", "PassiveTooltip"
-            "Passives"
-        };
-
     public static async Task<ConcurrentDictionary<
         string,
         IReadOnlyList<StatementEntry>
@@ -123,26 +115,7 @@ public static class ParserUtility
 
                             return null;
                         })
-                        .Where(s =>
-                        {
-                            if (s is null)
-                                return false;
-                            var ctor = s.FirstAncestorOrSelf<ConstructorDeclarationSyntax>();
-                            if (ctor is null)
-                                return true; // Not in a constructor, so include it
-
-                            // It's in a constructor, check if the class is in the extraction list
-                            if (ctor.Parent is ClassDeclarationSyntax classDecl)
-                            {
-                                // If the class is in the list, we should EXCLUDE the string statement
-                                // because the whole constructor will be extracted.
-                                return !ClassesForConstructorExtraction.Contains(
-                                    classDecl.Identifier.ValueText
-                                );
-                            }
-
-                            return true; // Not in a class (shouldn't happen for a ctor), include it
-                        })
+                        .Where(s => s is not null)
                         .Distinct();
 
                     var nodesByScope = candidateNodes.GroupBy(
@@ -200,36 +173,6 @@ public static class ParserUtility
                                 )
                             );
                         }
-                    }
-
-                    // Add constructors as entries
-                    var constructorDeclarations = root.DescendantNodes()
-                        .OfType<ConstructorDeclarationSyntax>()
-                        .Where(
-                            ctor =>
-                                ctor.Parent is ClassDeclarationSyntax classDecl
-                                && ClassesForConstructorExtraction.Contains(
-                                    classDecl.Identifier.ValueText
-                                )
-                        );
-                    foreach (var ctor in constructorDeclarations)
-                    {
-                        var text = ctor.ToFullString().Trim();
-                        var hash = HashUtility.ComputePositionAwareSha256Hash(
-                            text,
-                            ctor.Span.Start
-                        );
-                        var startLine = ctor.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-                        statements.Add(
-                            new StatementEntry(
-                                text,
-                                hash,
-                                ctor.Span.Start,
-                                ctor.Span.Length,
-                                ctor.Identifier.ValueText, // memberName
-                                startLine
-                            )
-                        );
                     }
 
                     if (statements.Any())
