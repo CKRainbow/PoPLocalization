@@ -99,7 +99,15 @@ public static class ParserUtility
                             return typeInfo?.SpecialType == SpecialType.System_String;
                         });
 
-                    var candidateNodes = stringExpressions
+                    var filterCaseLabelExpressions = stringExpressions.Where(
+                        expr =>
+                            expr.FirstAncestorOrSelf<CaseSwitchLabelSyntax>() == null
+                            && expr.FirstAncestorOrSelf<StatementSyntax>()
+                                is not SwitchStatementSyntax
+                            && expr.FirstAncestorOrSelf<StatementSyntax>() is not IfStatementSyntax
+                    );
+
+                    var candidateNodes = filterCaseLabelExpressions
                         .Select(e =>
                         {
                             var statement = e.FirstAncestorOrSelf<StatementSyntax>();
@@ -160,6 +168,11 @@ public static class ParserUtility
                                 text,
                                 s.Span.Start
                             );
+                            // if (s.GetType() == typeof(SwitchStatementSyntax))
+                            // {
+                            //     Console.WriteLine(s.GetType().Name);
+                            //     Console.WriteLine(s.ToString());
+                            // }
                             var startLine =
                                 s.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                             statements.Add(
