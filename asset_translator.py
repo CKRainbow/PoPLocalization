@@ -43,19 +43,23 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
                 data = obj.read_typetree()
                 if "m_text" in data and data["m_text"]:
                     original_text = data["m_text"]
-                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                    key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
-                    key = generate_hash(key_source)
-                    context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
+                elif "m_Text" in data and data["m_Text"]:
+                    original_text = data["m_Text"]
+                else:
+                    continue
+                gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
+                key = generate_hash(key_source)
+                context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
 
-                    entry = ParatranzEntry(
-                        key=key,
-                        original=original_text,
-                        translation="",
-                        stage=0,
-                        context=context,
-                    )
-                    paratranz_entries.append(entry)
+                entry = ParatranzEntry(
+                    key=key,
+                    original=original_text,
+                    translation="",
+                    stage=0,
+                    context=context,
+                )
+                paratranz_entries.append(entry)
             except Exception:
                 pass
     return paratranz_entries
@@ -393,8 +397,13 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
                 if (obj.path_id, script_name, gameObject_path_id) in translated_entry_map:
                     if "m_text" in data and data["m_text"]:
                         data["m_text"] = translated_entry_map[(obj.path_id, script_name, gameObject_path_id)]["translation"]
-                        obj.save_typetree(data)
-                        modified_count += 1
+                    elif "m_Text" in data and data["m_Text"]:
+                        data["m_Text"] = translated_entry_map[(obj.path_id, script_name, gameObject_path_id)]["translation"]
+                    else:
+                        print(f"Warning: No 'm_text' or 'm_Text' field found in object {obj.path_id} {script_name} {gameObject_path_id}.")
+                        continue
+                    obj.save_typetree(data)
+                    modified_count += 1
             except Exception as e:
                 print(f"Warning: Failed to process PathID {path_id}. Reason: {e}")
     
