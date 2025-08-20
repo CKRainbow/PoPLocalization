@@ -86,6 +86,29 @@ public static class ParserUtility
                 {
                     var model = compilation.GetSemanticModel(tree);
                     var root = tree.GetRoot(cancellationToken);
+                    var statements = new List<StatementEntry>();
+
+                    var enumDeclarations = root.DescendantNodes().OfType<EnumDeclarationSyntax>();
+                    foreach (var enumDecl in enumDeclarations)
+                    {
+                        var text = enumDecl.ToFullString().Trim();
+                        var hash = HashUtility.ComputePositionAwareSha256Hash(
+                            text,
+                            enumDecl.Span.Start
+                        );
+                        var startLine =
+                            enumDecl.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                        statements.Add(
+                            new StatementEntry(
+                                text,
+                                hash,
+                                enumDecl.Span.Start,
+                                enumDecl.Span.Length,
+                                enumDecl.Identifier.ValueText,
+                                startLine
+                            )
+                        );
+                    }
 
                     var stringExpressions = root.DescendantNodes()
                         .OfType<ExpressionSyntax>()
@@ -129,8 +152,6 @@ public static class ParserUtility
                     var nodesByScope = candidateNodes.GroupBy(
                         node => node.FirstAncestorOrSelf<MemberDeclarationSyntax>()
                     );
-
-                    var statements = new List<StatementEntry>();
 
                     foreach (var group in nodesByScope)
                     {

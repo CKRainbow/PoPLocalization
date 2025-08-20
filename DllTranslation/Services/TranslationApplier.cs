@@ -208,7 +208,7 @@ public partial class TranslationApplier
                         newSourceText.ToString(),
                         cancellationToken
                     );
-                    Console.WriteLine($"✏️ 已更新文件: {relativePath}");
+                    // Console.WriteLine($"✏️ 已更新文件: {relativePath}");
                     fileModifiedCount++;
                 }
             }

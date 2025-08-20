@@ -91,13 +91,7 @@ jobs:
       if: steps.cache-decompiled.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        mkdir -p decompiled
-        cd decompiled
-        ilspycmd -p -o . -r ../Managed/ -lv CSharp12_0 ../Managed/Assembly-CSharp.dll
-
-        cd ..
-
-        python decompile_fix.py
+        bash ./decompile.sh
 
     - name: Install Python dependencies
       run: pip install -r requirements.txt
