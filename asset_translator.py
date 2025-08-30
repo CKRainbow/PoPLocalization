@@ -37,29 +37,57 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
                 monobehaviour = cast(MonoBehaviour, obj.parse_as_object(node, check_read=False))
                 script = monobehaviour.m_Script.deref_parse_as_object()
                 
-                if "text" not in script.m_Name.lower():
-                    continue
+                if "text" in script.m_Name.lower():
+                    data = obj.read_typetree()
+                    if "m_text" in data and data["m_text"]:
+                        original_text = data["m_text"]
+                    elif "m_Text" in data and data["m_Text"]:
+                        original_text = data["m_Text"]
+                    else:
+                        continue
+                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                    key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
+                    key = generate_hash(key_source)
+                    context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
 
-                data = obj.read_typetree()
-                if "m_text" in data and data["m_text"]:
-                    original_text = data["m_text"]
-                elif "m_Text" in data and data["m_Text"]:
-                    original_text = data["m_Text"]
-                else:
-                    continue
-                gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
-                key = generate_hash(key_source)
-                context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
+                    entry = ParatranzEntry(
+                        key=key,
+                        original=original_text,
+                        translation="",
+                        stage=0,
+                        context=context,
+                    )
+                    paratranz_entries.append(entry)
+                elif "itemcontroller" in script.m_Name.lower():
+                    data = obj.read_typetree()
+                    items = {
+                        "commonItems": data.get("commonItems", []),
+                        "rareItems": data.get("rareItems", []),
+                        "legendaryItems": data.get("legendaryItems", []),
+                        "specialItems": data.get("specialItems", []),
+                        "mythicItems": data.get("mythicItems", [])
+                    }
+                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                    for category, item_list in items.items():
+                        for item in item_list:
+                            if "name" in item and item["name"]:
+                                n = item["name"]
+                                original_text = item["description"]
+                                if len(original_text) == 0:
+                                    continue
+                                key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{category}:{n}:{original_text}"
+                                key = generate_hash(key_source)
+                                context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}\nJsonPath: {category}_{n}"
 
-                entry = ParatranzEntry(
-                    key=key,
-                    original=original_text,
-                    translation="",
-                    stage=0,
-                    context=context,
-                )
-                paratranz_entries.append(entry)
+                                entry = ParatranzEntry(
+                                    key=key,
+                                    original=original_text,
+                                    translation="",
+                                    stage=0,
+                                    context=context,
+                                )
+                                paratranz_entries.append(entry)
+
             except Exception:
                 pass
     return paratranz_entries
@@ -375,7 +403,9 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
         script = re.search(r"Script:\s*(.+)", context).group(1)
         gameObject_path_id = int(re.search(r"GameObjectID:\s*(\d+)", context).group(1))
 
-        translated_entry_map[(path_id, script, gameObject_path_id)] = entry
+        k = (path_id, script, gameObject_path_id)
+
+        translated_entry_map[k] = translated_entry_map.get(k, []) + [entry]
         translated_entry_path_id_set.add(path_id)
 
     if not translated_entry_map:
@@ -394,14 +424,40 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
                 script_name = script.m_Name
                 data = obj.read_typetree()
                 gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                if (obj.path_id, script_name, gameObject_path_id) in translated_entry_map:
-                    if "m_text" in data and data["m_text"]:
-                        data["m_text"] = translated_entry_map[(obj.path_id, script_name, gameObject_path_id)]["translation"]
-                    elif "m_Text" in data and data["m_Text"]:
-                        data["m_Text"] = translated_entry_map[(obj.path_id, script_name, gameObject_path_id)]["translation"]
+                k = (obj.path_id, script_name, gameObject_path_id)
+                if k in translated_entry_map:
+                    v = translated_entry_map[k]
+                    if len(v) <= 1:
+                        v = v[0]
+                        if "m_text" in data and data["m_text"]:
+                            data["m_text"] = v["translation"]
+                        elif "m_Text" in data and data["m_Text"]:
+                            data["m_Text"] = v["translation"]
+                        else:
+                            print(f"Warning: No 'm_text' or 'm_Text' field found in object {obj.path_id} {script_name} {gameObject_path_id}.")
+                            continue
                     else:
-                        print(f"Warning: No 'm_text' or 'm_Text' field found in object {obj.path_id} {script_name} {gameObject_path_id}.")
-                        continue
+                        if script_name.lower() == "itemcontroller":
+                            items = {
+                                "commonItems": data.get("commonItems", []),
+                                "rareItems": data.get("rareItems", []),
+                                "legendaryItems": data.get("legendaryItems", []),
+                                "specialItems": data.get("specialItems", []),
+                                "mythicItems": data.get("mythicItems", [])
+                            }
+                            translation_entrys = {
+                                re.search(r"JsonPath:\s*(.+)", entry["context"]).group(1): entry["translation"] for entry in v
+                            }
+                            for category, item_list in items.items():
+                                for item in item_list:
+                                    if "name" in item and item["name"]:
+                                        if item.get("description", "") == "":
+                                            continue
+                                        n = item["name"]
+                                        if f"{category}_{n}" in translation_entrys:
+                                            item["description"] = translation_entrys[f"{category}_{n}"]
+                                        else:
+                                            print(f"Warning: No translation found for item '{n}' in category '{category}' for object {obj.path_id} {script_name} {gameObject_path_id}.")
                     obj.save_typetree(data)
                     modified_count += 1
             except Exception as e:
