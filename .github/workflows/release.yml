@@ -1,8 +1,9 @@
-name: Create Pre-release
+name: Create Release / Pre-release
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*-chs-*' ]
   workflow_dispatch:
   schedule: # Runs every Tuesday and Friday at 12:00 PM UTC
     - cron: '0 12 * * 2,5'
@@ -121,6 +122,12 @@ jobs:
         $readmeContent = $readmeContent -replace "{GAME_VERSION}", "${{ steps.game_version.outputs.VERSION }}"
         Set-Content -Path readme.txt -Value $readmeContent
 
+    - name: Append Tag to Readme on Release
+      if: github.ref_type == 'tag'
+      shell: pwsh
+      run: |
+        Add-Content -Path readme.txt -Value "`nTag: ${{ github.ref_name }}"
+
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
@@ -132,7 +139,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: PortalsOfPhereonChineseLocalization.zip
-        tag_name: build-${{ github.run_number }}
-        name: "Build ${{ github.run_number }} for Game Version ${{ steps.game_version.outputs.VERSION }}"
-        body: "自动化预发布构建。此汉化补丁适用于游戏版本 **${{ steps.game_version.outputs.VERSION }}**。"
-        prerelease: true
+        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+        name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
+        body: ${{ github.ref_type == 'tag' && format('正式汉化补丁。此汉化补丁适用于游戏版本 **{0}**。\n\nTag: {1}', steps.game_version.outputs.VERSION, github.ref_name) || format('自动化预发布构建。此汉化补丁适用于游戏版本 **{0}**。', steps.game_version.outputs.VERSION) }}
+        prerelease: ${{ github.ref_type != 'tag' }}
