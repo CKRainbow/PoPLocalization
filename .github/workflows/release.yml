@@ -141,5 +141,6 @@ jobs:
         files: PortalsOfPhereonChineseLocalization.zip
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
         name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
-        body: ${{ github.ref_type == 'tag' && format('正式汉化补丁。此汉化补丁适用于游戏版本 **{0}**。\n\nTag: {1}', steps.game_version.outputs.VERSION, github.ref_name) || format('自动化预发布构建。此汉化补丁适用于游戏版本 **{0}**。', steps.game_version.outputs.VERSION) }}
+        body: |
+            ${{ github.ref_type == 'tag' && format('正式汉化补丁。此汉化补丁适用于游戏版本 **{0}**。\n\nTag: {1}', steps.game_version.outputs.VERSION, github.ref_name) || format('自动化预发布构建。此汉化补丁适用于游戏版本 **{0}**。', steps.game_version.outputs.VERSION) }}
         prerelease: ${{ github.ref_type != 'tag' }}
