@@ -1,125 +1,137 @@
-# Unity 游戏本地化混合解决方案
+# PoP 中文本地化发布库
 
-这是一个为 Unity 游戏设计的综合性本地化工具集，采用 C# 和 Python 混合的解决方案。它旨在自动化处理游戏逻辑（DLLs）和游戏资源（Assets）中的文本提取、翻译管理和应用流程。
+---
+![Static Badge](https://img.shields.io/badge/Author-Syvaron-brown?link=https://www.patreon.com/Syvaron/about)
+![GitHub release (with filter)](https://img.shields.io/github/v/release/CKRainbow/PoPLocalization?link=https%3A%2F%2Fgithub.com%2FCKRainbow/%2FPoPLocalization%2Flatest)
+![GitHub all releases](https://img.shields.io/github/downloads/CKRainbow/PoPLocalization/total?link=https%3A%2F%2Fgithub.com%2FCKRainbow/%2FPoPLocalization%2Freleases%2Flatest)
+![GitHub Repo stars](https://img.shields.io/github/stars/CKRainbow/PoPLocalization)
+![GitHub issues](https://img.shields.io/github/issues-raw/CKRainbow/PoPLocalization)
 
-整个流程围绕两大核心组件构建：
+官方 Discord 交流服务器：
 
-1.  **`DllTranslation` (C#)**: 一个强大的 .NET 命令行工具，专门负责处理从游戏 DLL 反编译出的 C# 源代码。它能够提取代码中的字符串，通过 Paratranz平台管理和更新翻译，并将翻译后的文本安全地应用回源代码中。
-2.  **`asset_translator.py` (Python)**: 一个基于 `UnityPy` 的灵活脚本，用于处理 Unity Asset 文件（如 `.asset`, `.prefab`）。它负责提取 `MonoBehaviour` 中的文本、应用翻译，并支持高精度的字体替换。
+[![](https://dcbadge.limes.pink/api/server/V2wRs83)](https://discord.gg/V2wRs83)
 
-通过顶层的 Shell 脚本（如 `pipeline.sh`），这两个组件被协同调度，形成一个完整、高效的自动化本地化流水线。
+汉化 Discord 交流服务器：
 
-## 整体工作流程
-
-推荐使用 `pipeline.sh` 脚本来一键执行完整的本地化流程。该脚本会自动协调以下步骤：
-
-1.  **C# 代码处理 (并行)**:
-    *   调用 `DllTranslation` 工具的 `pipeline` 命令。
-    *   从 `decompiled/` 目录中提取所有 `.cs` 文件中的可翻译字符串。
-    *   从 Paratranz 下载最新的翻译文件到 `old/` 目录。
-    *   比较新提取的字符串和旧的翻译，智能迁移已有翻译，并将结果保存到 `new/` 目录。
-    *   将 `new/` 目录中的翻译应用回 C# 源代码，生成修改后的代码到 `replaced/` 目录。
-
-2.  **Unity Asset 处理 (并行)**:
-    *   调用 `asset_translator.py` 工具的 `pipeline` 命令。
-    *   从指定的 Asset 文件（如 `data.unity3D`）中提取文本。
-    *   使用 `old/` 目录中的翻译（与 C# 代码共享）来更新 Asset 文本。
-    *   根据 `font_change_config.json` 配置文件，将 Asset 中的字体替换为 `TMPfont/` 中定义的新字体。
-    *   将修改后的 Asset 文件输出到 `output_assets/` 目录。
-
-3.  **编译 (并行)**:
-    *   在 `replaced/` 目录中，使用 `dotnet build` 编译已应用翻译的 C# 项目。
-
-脚本会等待所有并行的任务完成后结束，从而高效地完成对代码和资源的双重本地化处理。
-
-## 目录结构说明
-
-为了使流水线正常工作，项目依赖于特定的目录结构，其中大部分是临时工作目录：
-
--   `decompiled/`: 存放从游戏 `Assembly-CSharp.dll` 反编译出的 C# 源代码。**这是 C# 流水线的输入。**
--   `old/`: 存放从 Paratranz 下载的、作为基准的旧版翻译文件（JSON 格式）。
--   `new/`: 存放 C# 工具在 `old/` 基础上更新后生成的最新翻译文件。
--   `replaced/`: 存放已应用 `new/` 中翻译的 C# 源代码。**这是 C# 流水线的输出。**
--   `output_assets/`: 存放由 Python 脚本处理（应用翻译、替换字体）后生成的最终 Asset 文件。
--   `TMPfont/`: 包含用于替换的新字体资源。
--   `DllTranslation/`: C# 核心工具的项目源代码。
--   `asset_translator.py`: Python 核心工具的脚本文件。
-
-## 安装与要求
-
-1.  **Python 3.7+**: 确保您的系统已安装 Python。
-2.  **.NET SDK 9.0+**: 用于运行和构建 `DllTranslation` C# 项目。
-3.  **Python 依赖库**: 安装所需的 Python 库。
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **环境变量**: `pipeline.sh` 脚本需要一个名为 `PARATRANZ_TOKEN` 的环境变量来访问 Paratranz API。
-    ```bash
-    export PARATRANZ_TOKEN="YOUR_PARATRANZ_API_TOKEN"
-    ```
-
-## 使用方法
-
-### 主要流水线 (推荐)
-
-直接运行 `pipeline.sh` 来处理所有事务。在运行前，请确保 `decompiled/` 目录已准备好，并设置了 `PARATRANZ_TOKEN` 环境变量。
-
-```bash
-./pipeline.sh
-```
-
-### 仅处理 DLL
-
-如果只需要处理 C# 代码的本地化，可以运行 `dll_pipeline.sh`。
-
-```bash
-./dll_pipeline.sh
-```
+[![](https://dcbadge.limes.pink/api/server/hqj7WA7PKp)](https://discord.gg/hqj7WA7PKp)
 
 ---
 
-## 附录：核心组件命令详解
+<div align="center">
 
-### `DllTranslation` (C#)
+# 请在下载游玩前首先阅读本说明文档<br>对于在文档中写明的内容仍进行提问的将不作解答
 
-通过 `dotnet run --project DllTranslation -- [command] [options]` 调用。
+</div>
 
--   **`extract`**: 从 C# 文件中提取字符串。
--   **`update`**: 比较新旧代码，迁移翻译。
--   **`apply`**: 将翻译应用回 C# 代码。
--   **`pipeline`**: 执行 `extract` -> `download` -> `update` -> `apply` 的完整流程。
+---
 
-*更多详细参数请直接阅读 `DllTranslation/Program.cs`。*
+## 目录
 
-### `asset_translator.py` (Python)
+* [简介](#简介)
+  * [写在最前](#写在最前)
+  * [关于本仓库](#关于本仓库)
+  * [关于游戏发布下载](#关于游戏发布下载)
+  * [关于版本号](#关于版本号)
+* [免责声明](#免责声明)
+* [致谢名单](#致谢名单)
+* [更新日志](#更新日志)
 
-通过 `python asset_translator.py [command] [options]` 调用。
+---
 
-#### 1. `extract`
-从单个 Asset 文件中提取所有可翻译的文本。
-```bash
-python asset_translator.py extract --input <asset_file_path> --dll-folder <managed_dll_folder> --unity-version <version> --output <output_json_path>
+## 简介
+### 写在最前...
+- <img decoding="async" src="" width="24" alt=""> <b>游戏作者</b> $\color{brown} {Syvaron}$
+
+  - [Patreon 赞助页面][patreon]
+  - [官方 Discord][discord]
+  - [汉化 Discord][discord-zh]
+
+### 关于本仓库
+
+本仓库将在每周一（或许）更新游戏的简体中文本地化版本，仅供交流学习，请于下载后 24 小时内删除。如果你未满 18 岁，请勿下载此游戏。仓库本身不含游戏相关内容，仅作为发布地址。**对在其它平台下载的汉化游戏文件不保证安全性，请谨慎下载。**
+
+游戏完全免费游玩，**严禁**将中文本地化版本**用作商业盈利用途**或**公开大肆传播**，对于商业盈利或公开传播导致的可能法律后果完全由使用者自行承担，与汉化成员无关。
+
+如在游玩过程中遇到任何问题，或对汉化文本有建议，请[发布 issue(议题)][issues] 反馈，反馈时请附上出现问题时的**截图 + 描述 + 游戏存档文件 + 报错文件**，在其它平台反馈问题可能得不到回应。请不要删除自己的议题, 方便后来人查阅相关问题。请注意，本仓库仅解决由于游戏汉化版本导致的问题，如果问题在英文版能复现，请去游戏官方 [Discord][discord] 反映。
+
+### 关于游戏发布下载
+
+本仓库仅发布经过汉化后的核心资源包，并不包含完整的游戏本体，请先前往[官方 Discord][discord] 获取下载链接后自行下载后覆盖。
+
+- 本仓库每月一号更新，下载请见右侧/底部的 [releases(发行版)][releases-latest]
+
+### 使用方法
+于本仓库下载的核心资源包的压缩包文件结构如下：
 ```
-
-#### 2. `update`
-使用 C# 项目的 `update-asset` 命令来更新翻译。
-```bash
-python asset_translator.py update --tool-project-dir <path_to_csproj_dir> --old <old_trans_dir> --new <new_extracted_dir> --output <updated_trans_dir>
+PortalsOfPhereonChineseLocalization.zip
+│  readme.txt
+│
+└─PortalsOfPhereon_Data
+    │  data.unity3d
+    │
+    └─Managed
+            Assembly-CSharp.dll
 ```
+下载后请在游戏根目录（即打开游戏所用的`PortalsOfPhereon.exe`所在的目录）直接解压，并选择覆盖原文件即可。注意不要选择`解压到**文件夹`。
 
-#### 3. `apply`
-将翻译好的 JSON 文件写回到 Asset 文件中。
-```bash
-python asset_translator.py apply --trans <translated_json> --src <source_asset> --dll-folder <managed_dll_folder> --unity-version <version> --output <modified_asset>
-```
+### 关于版本号
+汉化版本号的基本结构是 `chs-x.y.z`，如 `chs-1.7.1a`
 
-#### 4. `change_font`
-基于 JSON 配置文件，精准替换 Asset 中的字体及相关资源。
-```bash
-python asset_translator.py change_font --target-asset <asset_file> --new-font-asset <new_font_asset_file> --config <config_json_path> --dll-folder <target_dll_folder> --new-font-dll-folder <new_font_dll_folder> --unity-version <version> --output <output_asset>
-```
+游戏版本号的基本结构是 `{游戏版本号}-chs-{汉化版本号}`，如 `v0.31.0.1-chs-1.0.0a`
 
-#### 5. `pipeline` (推荐)
-执行从提取到更换字体的完整自动化流程。
-```bash
-python asset_translator.py pipeline --input-asset <asset_file> --dll-folder <managed_dll_folder> --unity-version <version> --tool-project-dir <path_to_csproj_dir> --old-trans-dir <old_trans_dir> --new-font-asset <new_font_asset_file> --font-config <config_json_path> --new-font-dll-folder <new_font_dll_folder> --output-asset <final_asset_path> --work-dir <path_for_temp_files>
+汉化版本号的修改遵循如下规则：
+1. `a` / `b` / `r` 分别代表：
+  - `alpha`: 当前翻译率达到 100%, 可能有漏提取的文本，润色不充分
+  - `beta`: 当前翻译率达到 100%, 没有漏提取的文本，润色不充分
+  - `release`: 当前翻译率达到 100%, 没有漏提取的文本，已经充分润色
+2. 如果游戏版本号发生破坏性更新：如 `v0.31.0.1` -> `v0.32.0.0`，则汉化版本号重置，如：
+  - `v0.31.0.1-chs-1.7.1a` => `v0.32.0.0-chs-1.0.0a`
+3. 如果游戏版本号发生小修小补更新：如 `v0.31.0.0` => `v0.31.0.1`，则汉化版本号第一位加一，如：
+  - `v0.31.0.0-chs-1.0.0a` => `v0.31.0.1-chs-2.0.0a`
+4. 常规更新，则汉化版本号第二位加一，如：
+  - `v0.31.0.1-chs-1.6.0a` => `v0.31.0.1-chs-1.7.0a`
+5. 出现了导致游戏无法继续进行的恶性问题而临时更新，则汉化版本号末位加一，如：
+  - `v0.31.0.1-chs-1.7.0a` => `v0.31.0.1-chs-1.7.1a`
+
+### Star 数
+
+[![Star History Chart](https://api.star-history.com/svg?repos=CKRainbow/PoPLocalization&type=Date)](https://star-history.com/#CKRainbow/PoPLocalization&Date)
+
+---
+
+## 免责声明
+
+1. 汉化组认可且负责的汉化版唯一发布渠道为 GitHub（即本仓库），其余渠道均不受认可，汉化组也不对来自其他渠道的汉化版本出现或造成的问题负责。自非官方 GitHub 渠道获取的汉化版可能会被篡改，可能会造成不可预料的后果，请务必以 GitHub 渠道发布的汉化版为准。我们可能不会接受使用非官方发布版本的内容反馈。
+2. 汉化组不对任何修改后的汉化版本负责，包括但不限于修改游戏本体 html 文件，使用可能改变游戏内容的模组，使用他人发布的整合包等；汉化组也不会为任何第三方发布的模组版/修改版/魔改版/整合包等背书或担保。请在反馈问题前检查游戏是否已被修改，若被修改请勿提交，我们可能不会接受使用修改版本的内容反馈。
+3. 请尽量避免重复报告问题。汉化版游戏文件夹根目录会有文件提示当前汉化版本号，反馈问题时请确认自己正使用最新版本的汉化版，请不要提交过时版本中出现的问题。鉴于此，推荐使用 GitHub 的 `issue` 系统提交问题，在提交前请自行寻找 `closed issues` 中是否已存在相同问题。
+4. 汉化组仅能忠实将原游戏内容以中文呈现，无法对原游戏内容做出更改，亦无法决定将来的内容变更或更新。一切有关更新计划、游戏机制、剧情、角色、世界观等方面的内容均以原作者 syvaron 为准。汉化组可能会收集有关问题并向 syvaron 反馈，但不做保证，也无法保证 syvaron 会回答。
+5. 汉化组的职能仅限于汉化游戏文本，以及修复由汉化所导致的游戏问题。对汉化组人员提出的其他任何需求，汉化组方面均有权拒绝。
+6. 本公告的最终解释权由汉化组享有，未尽事宜均以汉化组采取之行为为准。
+
+---
+
+## 致谢名单
+* 该 README 文件修改自[DOL汉化发布页][github-dol]
+* 其他请见 [致谢名单](CREDITS.md)
+
+---
+
+## 更新日志
+<details>
+<summary>点击展开</summary>
+
+- 2025.8.29
+  - 发布 `v0.1.9fix1-chs-1.4.0a` 版
+    - 修复了部分汉化错误，主要可能导致主奴活动闪退，性爱行为无法执行等问题
+    - 修正了部分文本
+
+</details>
+
+<!-- [itch]: https://rahimew.itch.io/bdcc -->
+[patreon]: https://www.patreon.com/Syvaron/about
+<!-- [github]: https://github.com/Alexofp/BDCC -->
+[github-dol]: https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/tree/main
+[discord]: https://discord.gg/V2wRs83
+[discord-zh]: https://discord.gg/hqj7WA7PKp
+[releases-latest]: https://github.com/CKRainbow/PoPLocalization/releases/latest
+[issues]: https://github.com/CKRainbow/PoPLocalization/issues
