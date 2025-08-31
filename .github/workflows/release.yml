@@ -2,14 +2,13 @@ name: Create Release / Pre-release
 
 on:
   push:
-    branches: [ main ]
     tags: [ 'v*-chs-*' ]
   workflow_dispatch:
   schedule: # Runs every Tuesday and Friday at 12:00 PM UTC
     - cron: '0 12 * * 2,5'
 
 jobs:
-  build-and-release:
+  build-and-release-windows:
     runs-on: windows-latest
     permissions:
       contents: write
@@ -60,15 +59,15 @@ jobs:
       run: |
         $latest = Get-Content -Path versions.json -Raw | ConvertFrom-Json
         echo "VERSION=$($latest.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        echo "URL=$($latest.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        echo "CACHE_KEY_SUFFIX=$($latest.cache_key_suffix)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "URL=$($latest.platforms.windows.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "CACHE_KEY_SUFFIX=$($latest.platforms.windows.cache_key_suffix)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
     - name: Cache Game Data Zip
       uses: actions/cache@v4
       id: cache-gamedata-zip
       with:
         path: PortalsOfPhereon_Data.zip
-        key: gamedata-zip-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
+        key: gamedata-zip-windows-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
 
     - name: Download Game Data
       if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
@@ -116,31 +115,147 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Prepare Release Notes
+      id: prep_readme
       shell: pwsh
       run: |
         $readmeContent = Get-Content -Path readme.txt -Raw
         $readmeContent = $readmeContent -replace "{GAME_VERSION}", "${{ steps.game_version.outputs.VERSION }}"
         Set-Content -Path readme.txt -Value $readmeContent
-
-    - name: Append Tag to Readme on Release
-      if: github.ref_type == 'tag'
-      shell: pwsh
-      run: |
-        Add-Content -Path readme.txt -Value "`nTag: ${{ github.ref_name }}"
+        if ('${{ github.ref_type }}' -eq 'tag') {
+          Add-Content -Path readme.txt -Value "`nTag: ${{ github.ref_name }}"
+        }
 
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
         Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
-        Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization.zip
+        Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows.zip
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
       with:
-        files: PortalsOfPhereonChineseLocalization.zip
+        files: PortalsOfPhereonChineseLocalization-Windows.zip
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
         name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
         body: |
             ${{ github.ref_type == 'tag' && format('正式汉化补丁。此汉化补丁适用于游戏版本 **{0}**。\n\nTag: {1}', steps.game_version.outputs.VERSION, github.ref_name) || format('自动化预发布构建。此汉化补丁适用于游戏版本 **{0}**。', steps.game_version.outputs.VERSION) }}
         prerelease: ${{ github.ref_type != 'tag' }}
+        
+  build-and-release-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write # Required to delete releases and tags
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Cache dotnet tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.dotnet/tools
+        key: ${{ runner.os }}-dotnet-tools-ilspycmd-9.1.0.7988
+
+    - name: Install ilspycmd
+      run: dotnet tool install --global ilspycmd --version 9.1.0.7988
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/DllTranslation.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Cache Pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Get Latest Game Version
+      id: game_version
+      shell: bash
+      run: |
+        echo "VERSION=$(jq -r '.version' versions.json)" >> $GITHUB_OUTPUT
+        echo "URL=$(jq -r '.platforms.linux.url' versions.json)" >> $GITHUB_OUTPUT
+        echo "CACHE_KEY_SUFFIX=$(jq -r '.platforms.linux.cache_key_suffix' versions.json)" >> $GITHUB_OUTPUT
+
+    - name: Cache Game Data Zip
+      uses: actions/cache@v4
+      id: cache-gamedata-zip
+      with:
+        path: PortalsOfPhereon_Data.zip
+        key: gamedata-zip-linux-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
+
+    - name: Download Game Data
+      if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
+      run: curl -L -o PortalsOfPhereon_Data.zip '${{ steps.game_version.outputs.URL }}'
+
+    - name: Extract Game Data
+      shell: bash
+      run: |
+        mkdir -p Managed
+        unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
+        unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/Managed/*" -d Managed/
+
+    - name: Cache Decompiled Code
+      uses: actions/cache@v4
+      id: cache-decompiled
+      with:
+        path: ./decompiled
+        key: ${{ runner.os }}-decompiled-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
+
+    - name: Decompile and Fix
+      if: steps.cache-decompiled.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        bash ./decompile.sh
+
+    - name: Install Python dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run pipeline script
+      shell: bash
+      run: |
+        bash ./pipeline.sh
+      env:
+          PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
+          PYTHONUTF8: 1
+
+    - name: Prepare Release Notes
+      id: prep_readme
+      shell: bash
+      run: |
+        cp readme.txt readme-linux.txt
+        sed -i "s/{GAME_VERSION}/${{ steps.game_version.outputs.VERSION }}/g" readme-linux.txt
+        if [ "${{ github.ref_type }}" == "tag" ]; then
+          echo "" >> readme-linux.txt
+          echo "Tag: ${{ github.ref_name }}" >> readme-linux.txt
+        fi
+
+    - name: Package Release Artifacts
+      run: |
+        mkdir -p PortalsOfPhereon_Data/Managed
+        cp output_assets/data.unity3d PortalsOfPhereon_Data/data.unity3d
+        cp replaced/bin/Release/net40/Assembly-CSharp.dll PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        zip -r PortalsOfPhereonChineseLocalization-Linux.zip PortalsOfPhereon_Data readme-linux.txt
+
+    - name: Append Artifacts to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: PortalsOfPhereonChineseLocalization-Linux.zip

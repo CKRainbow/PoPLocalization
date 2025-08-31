@@ -1,5 +1,13 @@
 {
     "version": "v0.31.0.1",
-    "url": "https://pixeldrain.com/api/file/P2aSNnft?download",
-    "cache_key_suffix": "P2aSNnft-v1"
+    "platforms": {
+        "windows": {
+            "url": "https://pixeldrain.com/api/file/P2aSNnft?download",
+            "cache_key_suffix": "P2aSNnft-v1"
+        },
+        "linux": {
+            "url": "https://pixeldrain.com/api/file/bqAot6T4?download",
+            "cache_key_suffix": "bqAot6T4-v1"
+        }
+    }
 }
