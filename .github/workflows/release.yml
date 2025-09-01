@@ -2,7 +2,8 @@ name: Create Release / Pre-release
 
 on:
   push:
-    tags: [ 'v*-chs-*' ]
+    tags:
+      - 'v*-chs-*'
   workflow_dispatch:
   schedule: # Runs every Tuesday and Friday at 12:00 PM UTC
     - cron: '0 12 * * 2,5'
