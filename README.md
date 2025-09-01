@@ -120,10 +120,9 @@ PortalsOfPhereonChineseLocalization.zip
 <details>
 <summary>点击展开</summary>
 
-- 2025.8.29
-  - 发布 `v0.1.9fix1-chs-1.4.0a` 版
-    - 修复了部分汉化错误，主要可能导致主奴活动闪退，性爱行为无法执行等问题
-    - 修正了部分文本
+- 2025.9.1
+  - 发布 `v0.31.0.1-chs-1.0.0a` 版
+    - 正式发布
 
 </details>
 
