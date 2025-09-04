@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, cast
 import UnityPy
 from UnityPy.helpers.TypeTreeGenerator import TypeTreeGenerator
 from UnityPy.helpers.Tpk import get_typetree_node
-from UnityPy.classes import MonoBehaviour
+from UnityPy.classes import MonoBehaviour, GameObject, Transform, RectTransform
 
 # Based on DllTranslation/Models/ParatranzEntry.cs
 @dataclass
@@ -20,6 +20,54 @@ class ParatranzEntry:
     stage: int
     context: str
 
+def construct_scene_hierarchy(env: UnityPy.AssetsManager):
+    """Gather root objects from the environment."""
+    scene_hierarchy = {}
+    for asset in env.assets:
+        scene_hierarchy[asset.name] = {}
+        for path_id, obj in asset.objects.items():
+            if obj.type.name == "GameObject":
+                if obj.path_id in scene_hierarchy[asset.name]:
+                    continue
+                go = cast(GameObject, obj.read())
+                scene_hierarchy[asset.name][path_id] = go.m_Name
+                if any(component.type.name == "RectTransform" for component in go.m_Components):
+                    for _, path_id, path in traverse_hierarchy(go, go.m_Name, path_id):
+                        scene_hierarchy[asset.name][path_id] = path
+                elif go.m_Transform:
+                    for _, path_id, path in traverse_hierarchy(go, go.m_Name, path_id, transform="Transform"):
+                        scene_hierarchy[asset.name][path_id] = path
+    return scene_hierarchy
+
+def traverse_hierarchy(go: GameObject, path: str, path_id: int, transform: str = "RectTransform"):
+    """Recursively traverse the hierarchy of GameObjects."""
+    yield go, path_id, path
+    if transform == "Transform":
+        if not go.m_Transform:
+            return
+        tf = cast(Transform, go.m_Transform.read())
+        for child_tf_ptr in tf.m_Children:
+            child_tf = child_tf_ptr.read()
+            if not child_tf.m_GameObject:
+                continue
+            child_go = cast(GameObject, child_tf.m_GameObject.read())
+            yield from traverse_hierarchy(child_go, f"{path}/{child_go.m_Name}", child_tf.m_GameObject.path_id, transform)
+    elif transform == "RectTransform":
+        m_RectTransform = None
+        for component in go.m_Components:
+            if component.type.name == "RectTransform":
+                m_RectTransform = component
+                break
+        if not m_RectTransform:
+            return
+        rt = cast(RectTransform, m_RectTransform.read())
+        for child_rt_ptr in rt.m_Children:
+            child_rt = child_rt_ptr.read()
+            if not child_rt.m_GameObject:
+                continue
+            child_go = cast(GameObject, child_rt.m_GameObject.read())
+            yield from traverse_hierarchy(child_go, f"{path}/{child_go.m_Name}", child_rt.m_GameObject.path_id, transform)
+
 def generate_hash(text: str) -> str:
     """Generates a SHA256 hash for the given text."""
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
@@ -29,6 +77,8 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
     Core logic for extracting text from a loaded UnityPy Environment.
     Operates in memory and returns a list of ParatranzEntry objects.
     """
+    scene_hierarchy = construct_scene_hierarchy(env)
+            
     paratranz_entries: List[ParatranzEntry] = []
     for obj in env.objects:
         if obj.type.name == "MonoBehaviour":
@@ -45,10 +95,13 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
                         original_text = data["m_Text"]
                     else:
                         continue
+                    scene = obj.assets_file.name
                     gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                    gameObject_path = scene_hierarchy[scene][gameObject_path_id]
                     key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
                     key = generate_hash(key_source)
-                    context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
+
+                    context = f"GameObjectID: {gameObject_path_id}\nGameObjectPath: {gameObject_path}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
 
                     entry = ParatranzEntry(
                         key=key,
