@@ -2,166 +2,13 @@ import argparse
 import json
 import os
 import subprocess
-import hashlib
-import re
-from dataclasses import dataclass, asdict
-from typing import Optional, List, Dict, cast
+import shutil
+from dataclasses import asdict
+
 import UnityPy
 from UnityPy.helpers.TypeTreeGenerator import TypeTreeGenerator
-from UnityPy.helpers.Tpk import get_typetree_node
-from UnityPy.classes import MonoBehaviour, GameObject, Transform, RectTransform
 
-# Based on DllTranslation/Models/ParatranzEntry.cs
-@dataclass
-class ParatranzEntry:
-    key: str
-    original: str
-    translation: str
-    stage: int
-    context: str
-
-def construct_scene_hierarchy(env: UnityPy.AssetsManager):
-    """Gather root objects from the environment."""
-    scene_hierarchy = {}
-    for asset in env.assets:
-        scene_hierarchy[asset.name] = {}
-        for path_id, obj in asset.objects.items():
-            if obj.type.name == "GameObject":
-                if obj.path_id in scene_hierarchy[asset.name]:
-                    continue
-                go = cast(GameObject, obj.read())
-                scene_hierarchy[asset.name][path_id] = go.m_Name
-                if any(component.type.name == "RectTransform" for component in go.m_Components):
-                    for _, path_id, path in traverse_hierarchy(go, go.m_Name, path_id):
-                        scene_hierarchy[asset.name][path_id] = path
-                elif go.m_Transform:
-                    for _, path_id, path in traverse_hierarchy(go, go.m_Name, path_id, transform="Transform"):
-                        scene_hierarchy[asset.name][path_id] = path
-    return scene_hierarchy
-
-def traverse_hierarchy(go: GameObject, path: str, path_id: int, transform: str = "RectTransform"):
-    """Recursively traverse the hierarchy of GameObjects."""
-    yield go, path_id, path
-    if transform == "Transform":
-        if not go.m_Transform:
-            return
-        tf = cast(Transform, go.m_Transform.read())
-        for child_tf_ptr in tf.m_Children:
-            child_tf = child_tf_ptr.read()
-            if not child_tf.m_GameObject:
-                continue
-            child_go = cast(GameObject, child_tf.m_GameObject.read())
-            yield from traverse_hierarchy(child_go, f"{path}/{child_go.m_Name}", child_tf.m_GameObject.path_id, transform)
-    elif transform == "RectTransform":
-        m_RectTransform = None
-        for component in go.m_Components:
-            if component.type.name == "RectTransform":
-                m_RectTransform = component
-                break
-        if not m_RectTransform:
-            return
-        rt = cast(RectTransform, m_RectTransform.read())
-        for child_rt_ptr in rt.m_Children:
-            child_rt = child_rt_ptr.read()
-            if not child_rt.m_GameObject:
-                continue
-            child_go = cast(GameObject, child_rt.m_GameObject.read())
-            yield from traverse_hierarchy(child_go, f"{path}/{child_go.m_Name}", child_rt.m_GameObject.path_id, transform)
-
-def generate_hash(text: str) -> str:
-    """Generates a SHA256 hash for the given text."""
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
-
-def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[ParatranzEntry]:
-    """
-    Core logic for extracting text from a loaded UnityPy Environment.
-    Operates in memory and returns a list of ParatranzEntry objects.
-    """
-    scene_hierarchy = construct_scene_hierarchy(env)
-            
-    paratranz_entries: List[ParatranzEntry] = []
-    for obj in env.objects:
-        if obj.type.name == "MonoBehaviour":
-            try:
-                node = get_typetree_node(obj.class_id, obj.version)
-                monobehaviour = cast(MonoBehaviour, obj.parse_as_object(node, check_read=False))
-                script = monobehaviour.m_Script.deref_parse_as_object()
-                
-                if "text" in script.m_Name.lower():
-                    data = obj.read_typetree()
-                    if "m_text" in data and data["m_text"]:
-                        original_text = data["m_text"]
-                    elif "m_Text" in data and data["m_Text"]:
-                        original_text = data["m_Text"]
-                    else:
-                        continue
-                    scene = obj.assets_file.name
-                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                    gameObject_path = scene_hierarchy[scene][gameObject_path_id]
-                    key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
-                    key = generate_hash(key_source)
-
-                    context = f"GameObjectID: {gameObject_path_id}\nGameObjectPath: {gameObject_path}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
-
-                    entry = ParatranzEntry(
-                        key=key,
-                        original=original_text,
-                        translation="",
-                        stage=0,
-                        context=context,
-                    )
-                    paratranz_entries.append(entry)
-                elif "itemcontroller" in script.m_Name.lower():
-                    data = obj.read_typetree()
-                    items = {
-                        "commonItems": data.get("commonItems", []),
-                        "rareItems": data.get("rareItems", []),
-                        "legendaryItems": data.get("legendaryItems", []),
-                        "specialItems": data.get("specialItems", []),
-                        "mythicItems": data.get("mythicItems", [])
-                    }
-                    gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                    for category, item_list in items.items():
-                        for item in item_list:
-                            if "name" in item and item["name"]:
-                                n = item["name"]
-                                original_text = item["description"]
-                                if len(original_text) == 0:
-                                    continue
-                                key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{category}:{n}:{original_text}"
-                                key = generate_hash(key_source)
-                                context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}\nJsonPath: {category}_{n}"
-
-                                entry = ParatranzEntry(
-                                    key=key,
-                                    original=original_text,
-                                    translation="",
-                                    stage=0,
-                                    context=context,
-                                )
-                                paratranz_entries.append(entry)
-                elif "dropdown" in script.m_Name.lower():
-                    data = obj.read_typetree()
-                    options = data.get("m_Options", {}).get("m_Options", [])
-                    for option in options:
-                        if "m_Text" in option and option["m_Text"]:
-                            original_text = option["m_Text"]
-                            gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                            key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
-                            key = generate_hash(key_source)
-                            context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
-
-                            entry = ParatranzEntry(
-                                key=key,
-                                original=original_text,
-                                translation="",
-                                stage=0,
-                                context=context,
-                            )
-                            paratranz_entries.append(entry)
-            except Exception:
-                pass
-    return paratranz_entries
+from asset_translator_lib.operations import core_apply, core_change_font, core_extract
 
 def extract(args):
     """
@@ -203,11 +50,12 @@ def extract(args):
             for key, contexts in duplicates.items():
                 print(f"\n  - \033[91mDuplicate Key: {key}\033[0m")
                 for i, context in enumerate(contexts):
-                    # Indent context for readability
                     indented_context = "      ".join(context.splitlines(True))
                     print(f"    - \033[96mContext {i+1}:\033[0m\n      ---\n      {indented_context}\n      ---")
         
-        os.makedirs(os.path.dirname(args.output), exist_ok=True)
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump([asdict(e) for e in paratranz_entries], f, ensure_ascii=False, indent=4)
         print(f"✅ Successfully extracted {len(paratranz_entries)} entries to '{args.output}'")
@@ -226,7 +74,6 @@ def update(args):
     new_dir = args.new
     output_dir = args.output
 
-    # 1. Validate paths
     if not os.path.isdir(project_dir):
         print(f"Error: DllTranslation project directory not found at '{project_dir}'")
         return
@@ -239,29 +86,16 @@ def update(args):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # 2. Construct the 'dotnet run' command
     command = [
-        "dotnet",
-        "run",
-        "--project",
-        project_dir,
-        "--", # Separator for application arguments
-        "update-asset",
-        "--old",
-        old_dir,
-        "--new",
-        new_dir,
-        "--output",
-        output_dir,
+        "dotnet", "run", "--project", project_dir, "--",
+        "update-asset", "--old", old_dir, "--new", new_dir, "--output", output_dir,
     ]
 
     print(f"Running command: {' '.join(command)}")
 
-    # 3. Execute the command
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
         
-        # Real-time output streaming
         while True:
             output = process.stdout.readline()
             if output == '' and process.poll() is not None:
@@ -271,7 +105,6 @@ def update(args):
         
         rc = process.poll()
         if rc != 0:
-            # Raise an exception to halt the pipeline on failure
             raise RuntimeError(f"Update command failed with return code {rc}. Check the output above for details.")
         
         print("Update command executed successfully.")
@@ -282,139 +115,11 @@ def update(args):
         raise RuntimeError(f"An error occurred while running the update command: {e}")
 
 
-def font_asset_adoption(src_typetree: Dict, target_typetree: Dict) -> Dict:
-    """
-    Adopts essential properties from an old font asset typetree to a new one.
-    This preserves references and metadata within the target asset file.
-    """
-    # Safely copy properties from old to new typetree, checking for existence first.
-    src_typetree["m_Script"]["m_PathID"] = target_typetree["m_Script"]["m_PathID"]
-    src_typetree["m_Name"] = target_typetree["m_Name"]
-    src_typetree["hashCode"] = target_typetree["hashCode"]
-    src_typetree["material"]["m_PathID"] = target_typetree["material"]["m_PathID"]
-    src_typetree["materialHashCode"] = target_typetree["materialHashCode"]
-    src_typetree["m_SourceFontFileGUID"] = target_typetree["m_SourceFontFileGUID"]
-    src_typetree["m_FaceInfo"]["m_FamilyName"] = target_typetree["m_FaceInfo"]["m_FamilyName"]
-    
-    # Safely adopt atlas texture PathIDs
-    for i, old_atlas_texture in enumerate(target_typetree["m_AtlasTextures"]):
-        if i < len(src_typetree["m_AtlasTextures"]) and "m_PathID" in old_atlas_texture:
-            src_typetree["m_AtlasTextures"][i]["m_PathID"] = old_atlas_texture["m_PathID"]
-
-    # Safely adopt creation settings GUIDs
-    if "sourceFontFileGUID" in target_typetree["m_CreationSettings"]:
-        src_typetree["m_CreationSettings"]["sourceFontFileGUID"] = target_typetree["m_CreationSettings"]["sourceFontFileGUID"]
-    if "referencedFontAssetGUID" in target_typetree["m_CreationSettings"]:
-        src_typetree["m_CreationSettings"]["referencedFontAssetGUID"] = target_typetree["m_CreationSettings"]["referencedFontAssetGUID"]
-    return src_typetree
-
-
-def core_change_font(
-    target_env: UnityPy.Environment,
-    new_font_env: UnityPy.Environment,
-    config: Dict,
-) -> UnityPy.Environment:
-    """
-    Core logic for changing fonts and related assets based on a config file.
-    Operates on a loaded UnityPy Environment.
-    """
-    def build_maps(env: UnityPy.Environment, config: Dict):
-        font_asset_config = config.get("font_assets", None)
-        texture_config = config.get("textures", None)
-        material_config = config.get("materials", None)
-
-        font_assets = {}
-        textures = {}
-        materials = {}
-
-        for obj in env.objects:
-            if font_asset_config is not None and obj.type.name == 'MonoBehaviour':
-                if obj.path_id not in font_asset_config["path_id"]:
-                    continue
-                node = get_typetree_node(obj.class_id, obj.version)
-                monobehaviour = cast(MonoBehaviour, obj.parse_as_object(node, check_read=False))
-                script = monobehaviour.m_Script.deref_parse_as_object()
-                if "TMP_FontAsset" != script.m_Name:
-                    continue
-                font_assets[obj.path_id] = obj
-            elif texture_config is not None and obj.type.name == 'Texture2D':
-                if obj.path_id not in texture_config["path_id"]:
-                    continue
-                data = obj.read()
-                if data.m_Name not in texture_config["name"]:
-                    continue
-                textures[(obj.path_id, data.m_Name)] = obj
-            elif material_config is not None and obj.type.name == 'Material':
-                if obj.path_id not in material_config["path_id"]:
-                    continue
-                typetree = obj.read_typetree()
-                if typetree["m_Name"] not in material_config["name"]:
-                    continue
-                materials[(obj.path_id, typetree["m_Name"])] = obj
-
-        return font_assets, textures, materials
-
-    source_font_assets, source_textures, _ = build_maps(new_font_env, config["source"])
-    new_font_assets, new_textures, new_materials = build_maps(target_env, config["target"])
-
-    if source_font_assets and new_font_assets:
-        for src_path_id, new_path_id in zip(config["source"]["font_assets"]["path_id"], config["target"]["font_assets"]["path_id"]):
-            source_font_asset_obj = source_font_assets.get(src_path_id)
-            new_font_asset_obj = new_font_assets.get(new_path_id)
-            if not source_font_asset_obj or not new_font_asset_obj:
-                raise ValueError(f"PathID mapping for font asset (MonoBehaviour) {src_path_id}->{new_path_id} is invalid.")
-            new_typetree = new_font_asset_obj.read_typetree()
-            old_typetree = source_font_asset_obj.read_typetree()
-            adopted_typetree = font_asset_adoption(old_typetree, new_typetree)
-            new_font_asset_obj.save_typetree(adopted_typetree)
-            print(f"  - Modified Font Asset: PathID {src_path_id} -> {new_path_id}")
-    if source_textures and new_textures:
-        for src_path_id, src_name, new_path_id, new_name in zip(
-            config["source"]["textures"]["path_id"], 
-            config["source"]["textures"]["name"], 
-            config["target"]["textures"]["path_id"], 
-            config["target"]["textures"]["name"]
-        ):
-            source_texture_obj = source_textures.get((src_path_id, src_name))
-            new_texture_obj = new_textures.get((new_path_id, new_name))
-            if not source_texture_obj or not new_texture_obj:
-                raise ValueError(f"PathID mapping for texture (Texture2D) {src_path_id}->{new_path_id} is invalid.")
-            src_data = source_texture_obj.read()
-            new_data = new_texture_obj.read()
-            new_data.image = src_data.image
-            new_data.m_Width = src_data.m_Width
-            new_data.m_Height = src_data.m_Height
-
-            new_data.save()
-            print(f"  - Modified Texture: PathID {src_path_id} Name {src_name} -> {new_path_id} Name {new_name}")
-    if new_materials:
-        for new_path_id, new_name in zip(config["target"]["materials"]["path_id"], config["target"]["materials"]["name"]):
-            new_material_obj = new_materials.get((new_path_id, new_name))
-            if not new_material_obj:
-                raise ValueError(f"PathID mapping for material (Material) {new_path_id} is invalid.")
-            material_typetree = new_material_obj.read_typetree()
-            if "m_SavedProperties" in material_typetree:
-                floats = material_typetree["m_SavedProperties"]["m_Floats"]
-                modified = False
-                for i, (name, val) in enumerate(floats):
-                    if name == "_UnderlayOffsetX":
-                        floats[i] = (name, 0.1)
-                        modified = True
-                    elif name == "_UnderlayOffsetY":
-                        floats[i] = (name, -0.1)
-                        modified = True
-                if modified:
-                    new_material_obj.save_typetree(material_typetree)
-                    print(f"  - Modified Material: PathID {new_path_id}")
-
-    return target_env
-
 def change_font(args):
     """
     Wrapper for changing font. Handles file I/O and calls the core logic.
     """
     print("Executing 'change_font' command...")
-    import shutil
 
     if not all(os.path.exists(p) for p in [args.target_asset, args.new_font_asset, args.config, args.dll_folder, args.new_font_dll_folder]):
         print("Error: One or more input files/folders not found.")
@@ -424,26 +129,22 @@ def change_font(args):
         with open(args.config, "r", encoding="utf-8") as f:
             config_data = json.load(f)
 
-        os.makedirs(os.path.dirname(args.output), exist_ok=True)
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         shutil.copy2(args.target_asset, args.output)
         
-        # Generator for the target asset
         target_generator = TypeTreeGenerator(args.unity_version)
         target_generator.load_local_dll_folder(args.dll_folder)
         target_env = UnityPy.load(args.output)
         target_env.typetree_generator = target_generator
 
-        # Generator for the new font asset
         new_font_generator = TypeTreeGenerator(args.unity_version)
         new_font_generator.load_local_dll_folder(args.new_font_dll_folder)
         new_font_env = UnityPy.load(args.new_font_asset)
         new_font_env.typetree_generator = new_font_generator
 
-        modified_env = core_change_font(
-            target_env,
-            new_font_env,
-            config_data,
-        )
+        modified_env = core_change_font(target_env, new_font_env, config_data)
 
         with open(args.output, "wb") as f:
             f.write(modified_env.file.save())
@@ -453,99 +154,36 @@ def change_font(args):
         print(f"An error occurred during change_font: {e}")
 
 
-def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Environment:
+def apply(args):
     """
-    Core logic for applying translations. Operates on a loaded UnityPy Environment.
+    Wrapper for applying translations. Handles file I/O and calls the core logic.
     """
-    with open(trans_file_path, "r", encoding="utf-8") as f:
-        trans_data = json.load(f)
+    print("Executing 'apply' command...")
 
-    # Filter for entries that have a translation and context
-    translated_entries = [
-        entry for entry in trans_data if entry and entry.get("context")
-    ]
+    if not all(os.path.exists(p) for p in [args.trans, args.src, args.dll_folder]):
+        print("Error: One or more input files/folders not found.")
+        return
 
-    translated_entry_map = {}
-    translated_entry_path_id_set = set()
+    try:
+        output_dir = os.path.dirname(args.output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        shutil.copy2(args.src, args.output)
 
-    for entry in translated_entries:
-        context = entry["context"]
-        path_id = int(re.search(r"PathID:\s*(\d+)", context).group(1))
-        script = re.search(r"Script:\s*(.+)", context).group(1)
-        gameObject_path_id = int(re.search(r"GameObjectID:\s*(\d+)", context).group(1))
+        generator = TypeTreeGenerator(args.unity_version)
+        generator.load_local_dll_folder(args.dll_folder)
+        env = UnityPy.load(args.output)
+        env.typetree_generator = generator
 
-        k = (path_id, script, gameObject_path_id)
+        modified_env = core_apply(env, args.trans)
 
-        translated_entry_map[k] = translated_entry_map.get(k, []) + [entry]
-        translated_entry_path_id_set.add(path_id)
+        with open(args.output, "wb") as f:
+            f.write(modified_env.file.save(packer="lz4"))
+        
+        print(f"Successfully saved applied translations to '{args.output}'")
+    except Exception as e:
+        print(f"An error occurred during apply: {e}")
 
-    if not translated_entry_map:
-        print("No valid translations with context found, skipping apply.")
-        return env
-    
-    modified_count = 0
-    for obj in env.objects:
-        if obj.type.name == "MonoBehaviour":
-            try:
-                if obj.path_id not in translated_entry_path_id_set:
-                    continue
-                node = get_typetree_node(obj.class_id, obj.version)
-                monobehaviour = cast(MonoBehaviour, obj.parse_as_object(node, check_read=False))
-                script = monobehaviour.m_Script.deref_parse_as_object()
-                script_name = script.m_Name
-                data = obj.read_typetree()
-                gameObject_path_id = data["m_GameObject"]["m_PathID"]
-                k = (obj.path_id, script_name, gameObject_path_id)
-                if k in translated_entry_map:
-                    v = translated_entry_map[k]
-                    if len(v) <= 1:
-                        v = v[0]
-                        if "m_text" in data and data["m_text"]:
-                            data["m_text"] = v["translation"]
-                        elif "m_Text" in data and data["m_Text"]:
-                            data["m_Text"] = v["translation"]
-                        else:
-                            print(f"Warning: No 'm_text' or 'm_Text' field found in object {obj.path_id} {script_name} {gameObject_path_id}.")
-                            continue
-                    else:
-                        if script_name.lower() == "itemcontroller":
-                            items = {
-                                "commonItems": data.get("commonItems", []),
-                                "rareItems": data.get("rareItems", []),
-                                "legendaryItems": data.get("legendaryItems", []),
-                                "specialItems": data.get("specialItems", []),
-                                "mythicItems": data.get("mythicItems", [])
-                            }
-                            translation_entrys = {
-                                re.search(r"JsonPath:\s*(.+)", entry["context"]).group(1): entry["translation"] for entry in v
-                            }
-                            for category, item_list in items.items():
-                                for item in item_list:
-                                    if "name" in item and item["name"]:
-                                        if item.get("description", "") == "":
-                                            continue
-                                        n = item["name"]
-                                        if f"{category}_{n}" in translation_entrys:
-                                            item["description"] = translation_entrys[f"{category}_{n}"]
-                                        else:
-                                            print(f"Warning: No translation found for item '{n}' in category '{category}' for object {obj.path_id} {script_name} {gameObject_path_id}.")
-                        elif "dropdown" in script_name.lower():
-                            options = data.get("m_Options", {}).get("m_Options", [])
-                            translation_entrys = {
-                                entry["original"]: entry["translation"] for entry in v
-                            }
-                            for option in options:
-                                if option["m_Text"] in translation_entrys:
-                                    option["m_Text"] = translation_entrys[option["m_Text"]]
-                                else:
-                                    print(f"Warning: No translation found for option '{option['m_Text']}' for object {obj.path_id} {script_name} {gameObject_path_id}.")
-                    obj.save_typetree(data)
-                    modified_count += 1
-            except Exception as e:
-                print(f"Warning: Failed to process PathID {path_id}. Reason: {e}")
-    
-    print(f"Applied {modified_count} translations in memory.")
-    return env
 
 def pipeline(args):
     """
@@ -576,7 +214,6 @@ def pipeline(args):
         
         if not paratranz_entries:
             print("No text entries found. Skipping translation steps.")
-            # If no text, we might still want to change the font
             modified_env = env
         else:
             os.makedirs(extracted_json_dir, exist_ok=True)
@@ -597,69 +234,33 @@ def pipeline(args):
             # === Step 3: Apply (in memory) ===
             print("\n--- [Step 3/4] Applying translations ---")
             if not os.path.isfile(updated_json_path):
-                raise FileNotFoundError(f"Critical: Updated translation file '{updated_json_path}' was not generated by the update step. Halting pipeline.")
+                raise FileNotFoundError(f"Critical: Updated translation file '{updated_json_path}' was not generated. Halting.")
             
             modified_env = core_apply(env, updated_json_path)
         
         # === Step 4: Change Font (in memory) ===
         print("\n--- [Step 4/4] Changing font ---")
-        # Load config for the font change step
         with open(args.font_config, "r", encoding="utf-8") as f:
             font_config_data = json.load(f)
         
-        # Create a dedicated generator for the new font asset
         new_font_generator = TypeTreeGenerator(args.unity_version)
         new_font_generator.load_local_dll_folder(args.new_font_dll_folder)
         new_font_env = UnityPy.load(args.new_font_asset)
         new_font_env.typetree_generator = new_font_generator
 
-        final_env = core_change_font(
-            modified_env,
-            new_font_env,
-            font_config_data
-        )
+        final_env = core_change_font(modified_env, new_font_env, font_config_data)
 
         # === Final Step: Save to File ===
         print("\n--- [Final] Saving all changes to output file ---")
         os.makedirs(os.path.dirname(args.output_asset), exist_ok=True)
-        # with open(args.output_asset, "wb") as f:
-        #     f.write(final_env.file.save(packer="lz4"))
+        with open(args.output_asset, "wb") as f:
+            f.write(final_env.file.save(packer="lz4"))
 
         print(f"\n✅ Pipeline finished successfully! Final asset saved to '{args.output_asset}'")
 
     except Exception as e:
         print(f"\n❌ An error occurred during the pipeline: {e}")
-        # Exit with a non-zero status code to indicate failure
         raise
-
-def apply(args):
-    """
-    Wrapper for applying translations. Handles file I/O and calls the core logic.
-    """
-    print("Executing 'apply' command...")
-    import shutil
-
-    if not all(os.path.exists(p) for p in [args.trans, args.src, args.dll_folder]):
-        print("Error: One or more input files/folders not found.")
-        return
-
-    try:
-        os.makedirs(os.path.dirname(args.output), exist_ok=True)
-        shutil.copy2(args.src, args.output)
-
-        generator = TypeTreeGenerator(args.unity_version)
-        generator.load_local_dll_folder(args.dll_folder)
-        env = UnityPy.load(args.output)
-        env.typetree_generator = generator
-
-        modified_env = core_apply(env, args.trans)
-
-        with open(args.output, "wb") as f:
-            f.write(modified_env.files.save(packer="lz4"))
-        
-        print(f"Successfully saved applied translations to '{args.output}'")
-    except Exception as e:
-        print(f"An error occurred during apply: {e}")
 
 
 def main():
@@ -704,25 +305,23 @@ def main():
 
     # --- Pipeline Command ---
     parser_pipeline = subparsers.add_parser("pipeline", help="Run the full extract-update-apply-change_font pipeline.")
-    # Extract args
     parser_pipeline.add_argument("--input-asset", required=True, help="The source Unity asset file to start the pipeline.")
-    # Shared args
     parser_pipeline.add_argument("--dll-folder", required=True, help="Path to the Managed folder containing game DLLs.")
     parser_pipeline.add_argument("--unity-version", required=True, help="The Unity version of the game.")
-    # Update args
     parser_pipeline.add_argument("--tool-project-dir", required=True, help="Path to the DllTranslation C# project directory.")
     parser_pipeline.add_argument("--old-trans-dir", required=True, help="Directory with old Paratranz JSON translations for the update step.")
-    # Change Font args
     parser_pipeline.add_argument("--new-font-asset", required=True, help="The asset file containing the new font assets and textures.")
     parser_pipeline.add_argument("--font-config", required=True, help="Path to the JSON config file for font replacement.")
     parser_pipeline.add_argument("--new-font-dll-folder", required=True, help="Path to the Managed folder for the NEW FONT asset.")
-    # Final output
     parser_pipeline.add_argument("--output-asset", required=True, help="The final output path for the modified asset file.")
     parser_pipeline.add_argument("--work-dir", default="./pipeline_workdir", help="Directory to store intermediate files.")
     parser_pipeline.set_defaults(func=pipeline)
 
     args = parser.parse_args()
-    args.func(args)
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
     main()
