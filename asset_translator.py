@@ -140,7 +140,25 @@ def core_extract(env: UnityPy.Environment, source_file_name: str) -> List[Paratr
                                     context=context,
                                 )
                                 paratranz_entries.append(entry)
+                elif "dropdown" in script.m_Name.lower():
+                    data = obj.read_typetree()
+                    options = data.get("m_Options", {}).get("m_Options", [])
+                    for option in options:
+                        if "m_Text" in option and option["m_Text"]:
+                            original_text = option["m_Text"]
+                            gameObject_path_id = data["m_GameObject"]["m_PathID"]
+                            key_source = f"{gameObject_path_id}:{script.m_Name}:{obj.path_id}:{original_text}"
+                            key = generate_hash(key_source)
+                            context = f"GameObjectID: {gameObject_path_id}\nPathID: {obj.path_id}\nScript: {script.m_Name}"
 
+                            entry = ParatranzEntry(
+                                key=key,
+                                original=original_text,
+                                translation="",
+                                stage=0,
+                                context=context,
+                            )
+                            paratranz_entries.append(entry)
             except Exception:
                 pass
     return paratranz_entries
@@ -444,7 +462,7 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
 
     # Filter for entries that have a translation and context
     translated_entries = [
-        entry for entry in trans_data if entry.get("translation") and entry.get("context")
+        entry for entry in trans_data if entry and entry.get("context")
     ]
 
     translated_entry_map = {}
@@ -511,6 +529,16 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
                                             item["description"] = translation_entrys[f"{category}_{n}"]
                                         else:
                                             print(f"Warning: No translation found for item '{n}' in category '{category}' for object {obj.path_id} {script_name} {gameObject_path_id}.")
+                        elif "dropdown" in script_name.lower():
+                            options = data.get("m_Options", {}).get("m_Options", [])
+                            translation_entrys = {
+                                entry["original"]: entry["translation"] for entry in v
+                            }
+                            for option in options:
+                                if option["m_Text"] in translation_entrys:
+                                    option["m_Text"] = translation_entrys[option["m_Text"]]
+                                else:
+                                    print(f"Warning: No translation found for option '{option['m_Text']}' for object {obj.path_id} {script_name} {gameObject_path_id}.")
                     obj.save_typetree(data)
                     modified_count += 1
             except Exception as e:
@@ -594,8 +622,8 @@ def pipeline(args):
         # === Final Step: Save to File ===
         print("\n--- [Final] Saving all changes to output file ---")
         os.makedirs(os.path.dirname(args.output_asset), exist_ok=True)
-        with open(args.output_asset, "wb") as f:
-            f.write(final_env.file.save(packer="lz4"))
+        # with open(args.output_asset, "wb") as f:
+        #     f.write(final_env.file.save(packer="lz4"))
 
         print(f"\n✅ Pipeline finished successfully! Final asset saved to '{args.output_asset}'")
 
