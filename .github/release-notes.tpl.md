@@ -1,0 +1,5 @@
+{RELEASE_TYPE}。此汉化补丁适用于游戏版本 **{GAME_VERSION}**。{TAG_INFO}
+
+本体下载地址：
+Windows: {WINDOWS_DOWNLOAD_URL}
+Linux: {LINUX_DOWNLOAD_URL}

@@ -60,19 +60,20 @@ jobs:
       run: |
         $latest = Get-Content -Path versions.json -Raw | ConvertFrom-Json
         echo "VERSION=$($latest.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        echo "URL=$($latest.platforms.windows.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        echo "CACHE_KEY_SUFFIX=$($latest.platforms.windows.cache_key_suffix)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "WINDOWS_URL=$($latest.platforms.windows.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "LINUX_URL=$($latest.platforms.linux.url)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "WINDOWS_CACHE_KEY_SUFFIX=$($latest.platforms.windows.cache_key_suffix)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
     - name: Cache Game Data Zip
       uses: actions/cache@v4
       id: cache-gamedata-zip
       with:
         path: PortalsOfPhereon_Data.zip
-        key: gamedata-zip-windows-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
+        key: gamedata-zip-windows-${{ steps.game_version.outputs.WINDOWS_CACHE_KEY_SUFFIX }}
 
     - name: Download Game Data
       if: steps.cache-gamedata-zip.outputs.cache-hit != 'true'
-      run: curl -L -o PortalsOfPhereon_Data.zip '${{ steps.game_version.outputs.URL }}'
+      run: curl -L -o PortalsOfPhereon_Data.zip '${{ steps.game_version.outputs.WINDOWS_URL }}'
 
     - name: Extract Game Data
       shell: bash
@@ -86,7 +87,7 @@ jobs:
       id: cache-decompiled
       with:
         path: ./decompiled
-        key: ${{ runner.os }}-decompiled-${{ steps.game_version.outputs.CACHE_KEY_SUFFIX }}
+        key: ${{ runner.os }}-decompiled-${{ steps.game_version.outputs.WINDOWS_CACHE_KEY_SUFFIX }}
 
     - name: Decompile and Fix
       if: steps.cache-decompiled.outputs.cache-hit != 'true'
@@ -121,11 +122,27 @@ jobs:
       run: |
         $readmeContent = Get-Content -Path readme.txt -Raw
         $readmeContent = $readmeContent -replace "{GAME_VERSION}", "${{ steps.game_version.outputs.VERSION }}"
+        $readmeContent = $readmeContent -replace "{WINDOWS_DOWNLOAD_URL}", "${{ steps.game_version.outputs.WINDOWS_URL }}"
+        $readmeContent = $readmeContent -replace "{LINUX_DOWNLOAD_URL}", "${{ steps.game_version.outputs.LINUX_URL }}"
         Set-Content -Path readme.txt -Value $readmeContent
         if ('${{ github.ref_type }}' -eq 'tag') {
           Add-Content -Path readme.txt -Value "`nTag: ${{ github.ref_name }}"
         }
 
+        $releaseBody = Get-Content -Path .github/release-notes.tpl.md -Raw
+        $releaseBody = $releaseBody -replace "{GAME_VERSION}", "${{ steps.game_version.outputs.VERSION }}"
+        $releaseBody = $releaseBody -replace "{WINDOWS_DOWNLOAD_URL}", "${{ steps.game_version.outputs.WINDOWS_URL }}"
+        $releaseBody = $releaseBody -replace "{LINUX_DOWNLOAD_URL}", "${{ steps.game_version.outputs.LINUX_URL }}"
+
+        if ('${{ github.ref_type }}' -eq 'tag') {
+          $releaseBody = $releaseBody -replace "{RELEASE_TYPE}", "正式汉化补丁"
+          $releaseBody = $releaseBody -replace "{TAG_INFO}", "`n`nTag: ${{ github.ref_name }}"
+        } else {
+          $releaseBody = $releaseBody -replace "{RELEASE_TYPE}", "自动化预发布构建"
+          $releaseBody = $releaseBody -replace "{TAG_INFO}", ""
+        }
+        Set-Content -Path .github/release-notes.md -Value $releaseBody
+        Add-Content -Path .github/release-notes.md -Value "若在下载时遇到问题，请尝试使用[代理下载](https://ghfast.top/)"
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
@@ -139,8 +156,7 @@ jobs:
         files: PortalsOfPhereonChineseLocalization-Windows.zip
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
         name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
-        body: |
-            ${{ github.ref_type == 'tag' && format('正式汉化补丁。此汉化补丁适用于游戏版本 **{0}**。\n\nTag: {1}', steps.game_version.outputs.VERSION, github.ref_name) || format('自动化预发布构建。此汉化补丁适用于游戏版本 **{0}**。', steps.game_version.outputs.VERSION) }}
+        body: .github/release-notes.md
         prerelease: ${{ github.ref_type != 'tag' }}
         
   # build-and-release-linux:
