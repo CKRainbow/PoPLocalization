@@ -156,7 +156,7 @@ jobs:
         Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows.zip
 
         $zip_output_dir = "PoP_${{ steps.game_version.outputs.VERSION}}_win"
-        Compress-Archive -Path $zip_output_dir -DestinationPath $zip_output_dir.zip
+        Compress-Archive -Path $zip_output_dir -DestinationPath "$($zip_output_dir).zip"
 
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
