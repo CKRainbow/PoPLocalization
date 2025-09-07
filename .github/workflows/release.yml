@@ -147,7 +147,6 @@ jobs:
           $releaseBody = $releaseBody -replace "{TAG_INFO}", ""
         }
         Set-Content -Path .github/release-notes.md -Value $releaseBody
-        Add-Content -Path .github/release-notes.md -Value "若在下载时遇到问题，请尝试使用[代理下载](https://ghfast.top/)"
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
