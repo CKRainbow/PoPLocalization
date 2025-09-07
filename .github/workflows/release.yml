@@ -78,9 +78,14 @@ jobs:
     - name: Extract Game Data
       shell: bash
       run: |
+        echo "Extracting game data..."
+        zip_output_dir=PoP_${{ steps.game_version.outputs.VERSION}}_win
         mkdir -p Managed
-        unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/data.unity3d" -d .
-        unzip -j -o PortalsOfPhereon_Data.zip "PortalsOfPhereon_Data/Managed/*" -d Managed/
+        mkdir -p $zip_output_dir
+        unzip PortalsOfPhereon_Data.zip -d $zip_output_dir
+        cp $zip_output_dir/PortalsOfPhereon_Data/Managed/* Managed/
+        rm $zip_output_dir/PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        mv $zip_output_dir/PortalsOfPhereon_Data/data.unity3d ./
 
     - name: Cache Decompiled Code
       uses: actions/cache@v4
@@ -150,13 +155,18 @@ jobs:
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
         Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows.zip
 
+        $zip_output_dir=PoP_${{ steps.game_version.outputs.VERSION}}_win
+        Compress-Archive -Path $zip_output_dir -DestinationPath $zip_output_dir.zip
+
     - name: Create Release and Upload Artifacts
       uses: softprops/action-gh-release@v2
       with:
-        files: PortalsOfPhereonChineseLocalization-Windows.zip
+        files: |
+          PortalsOfPhereonChineseLocalization-Windows.zip
+          PoP_${{ steps.game_version.outputs.VERSION}}_win.zip
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
         name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
-        body: .github/release-notes.md
+        body_path: .github/release-notes.md
         prerelease: ${{ github.ref_type != 'tag' }}
         
   # build-and-release-linux:
