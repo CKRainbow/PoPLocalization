@@ -155,7 +155,7 @@ jobs:
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
         Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows.zip
 
-        zip_output_dir=PoP_${{ steps.game_version.outputs.VERSION}}_win
+        $zip_output_dir = PoP_${{ steps.game_version.outputs.VERSION}}_win
         Compress-Archive -Path $zip_output_dir -DestinationPath $zip_output_dir.zip
 
     - name: Create Release and Upload Artifacts
