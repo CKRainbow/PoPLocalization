@@ -6,7 +6,7 @@ on:
       - 'v*-chs-*'
   workflow_dispatch:
   schedule: # Runs every Tuesday and Friday at 12:00 PM UTC
-    - cron: '0 12 * * 2,5'
+    - cron: '0 12 * * *'
 
 jobs:
   build-and-release-windows:
