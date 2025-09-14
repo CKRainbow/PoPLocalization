@@ -120,6 +120,11 @@ PortalsOfPhereonChineseLocalization.zip
 <details>
 <summary>点击展开</summary>
 
+- 2025.9.14
+  - 发布 `v0.31.0.1-chs-1.4.0a` 版
+    - 补充了部分缺失的汉化，包括全部种族名称、部分约会事件选项等
+    - 修正了部分错误的汉化
+
 - 2025.9.9
   - 发布 `v0.31.0.1-chs-1.3.0a` 版
     - 补充了部分缺失的汉化
