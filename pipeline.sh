@@ -10,6 +10,8 @@ dotnet run \
     --paratranz-project-id 15832 \
     --paratranz-token "$PARATRANZ_TOKEN"
 
+echo "Starting Post Fix"
+
 bash post_fix.sh
 
 {

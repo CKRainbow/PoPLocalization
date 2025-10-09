@@ -150,9 +150,11 @@ jobs:
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
-        Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
         Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
-        Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows.zip
+        Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows-PARTIAL.zip
+
+        Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
+        Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows-FULL.zip
 
         $zip_output_dir = "PoP_${{ steps.game_version.outputs.VERSION}}_win"
         Compress-Archive -Path $zip_output_dir -DestinationPath "$($zip_output_dir).zip"
@@ -161,7 +163,8 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          PortalsOfPhereonChineseLocalization-Windows.zip
+          PortalsOfPhereonChineseLocalization-Windows-FULL.zip
+          PortalsOfPhereonChineseLocalization-Windows-PARTIAL.zip
           PoP_${{ steps.game_version.outputs.VERSION}}_win.zip
         tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
         name: ${{ github.ref_type == 'tag' && format('Release {0} for Game Version {1}', github.ref_name, steps.game_version.outputs.VERSION) || format('Build {0} for Game Version {1}', github.run_number, steps.game_version.outputs.VERSION) }}
