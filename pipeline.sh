@@ -10,6 +10,8 @@ dotnet run \
     --paratranz-project-id 15832 \
     --paratranz-token "$PARATRANZ_TOKEN"
 
+bash post_fix.sh
+
 {
     python asset_translator.py pipeline \
     --work-dir . \
@@ -23,6 +25,7 @@ dotnet run \
     --new-font-dll-folder ./TMPfont/Managed \
     --output-asset ./output_assets/data.unity3D
 }&
+
 
 {
     cd replaced

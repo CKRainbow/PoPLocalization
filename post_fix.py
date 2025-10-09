@@ -10,14 +10,15 @@ FIXRULE = []
 
 FIXRULE.append(
     FixRule(
-        path="SaveLoadManager.cs",
+        path="OverWorldController.cs",
         fix_rules=[
-            ("ref string reference;", "ref string reference = ref array[0];"),
+            ("if (randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)", 
+             "if (randomNonHazardousValidTile is not null && randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)")
         ],
     )
 )
 
-def decompile_fix(directory: Path):
+def post_fix(directory: Path):
     
     for fix_rule in FIXRULE:
         target_file = directory / fix_rule.path
@@ -32,5 +33,5 @@ def decompile_fix(directory: Path):
             f.write(text)
 
 if __name__ == "__main__":
-    decompile_path = Path("./decompiled")
-    decompile_fix(decompile_path)
+    replaced_path = Path("./replaced")
+    post_fix(replaced_path)
