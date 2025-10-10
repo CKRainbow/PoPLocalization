@@ -18,6 +18,18 @@ FIXRULE.append(
     )
 )
 
+FIXRULE.append(
+    FixRule(
+        path="QuickCharacterManager.cs",
+        fix_rules=[
+            ("room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room2.roomID));"),
+            ("room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room3.roomID));"),
+            ("room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room4.roomID));"),
+            ("currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, currentRoom.roomID));")
+        ],
+    )
+)
+
 def post_fix(directory: Path):
     
     for fix_rule in FIXRULE:
