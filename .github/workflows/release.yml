@@ -150,7 +150,7 @@ jobs:
     - name: Package Release Artifacts
       run: |
         New-Item -Path PortalsOfPhereon_Data/Managed -ItemType Directory -Force
-        Copy-Item -Path replaced/bin/Release/net40/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
+        Copy-Item -Path replaced/bin/Release/netstandard2.1/Assembly-CSharp.dll -Destination PortalsOfPhereon_Data/Managed/Assembly-CSharp.dll
         Compress-Archive -Path PortalsOfPhereon_Data,readme.txt  -DestinationPath PortalsOfPhereonChineseLocalization-Windows-PARTIAL.zip
 
         Copy-Item -Path output_assets/data.unity3d -Destination PortalsOfPhereon_Data/data.unity3d
