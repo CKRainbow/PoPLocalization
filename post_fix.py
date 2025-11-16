@@ -1,6 +1,8 @@
 from pathlib import Path
 from dataclasses import dataclass
 
+from const import VERSION
+
 @dataclass
 class FixRule:
     path: str
@@ -8,27 +10,29 @@ class FixRule:
 
 FIXRULE = []
 
-FIXRULE.append(
-    FixRule(
-        path="OverWorldController.cs",
-        fix_rules=[
-            ("if (randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)", 
-             "if (randomNonHazardousValidTile is not null && randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)")
-        ],
-    )
-)
 
-FIXRULE.append(
-    FixRule(
-        path="QuickCharacterManager.cs",
-        fix_rules=[
-            ("room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room2.roomID));"),
-            ("room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room3.roomID));"),
-            ("room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room4.roomID));"),
-            ("currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, currentRoom.roomID));")
-        ],
+if VERSION < (0, 32, 0, 0):
+    FIXRULE.append(
+        FixRule(
+            path="OverWorldController.cs",
+            fix_rules=[
+                ("if (randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)", 
+                "if (randomNonHazardousValidTile is not null && randomNonHazardousValidTile.worldObject == OWTile.WorldObject.None)")
+            ],
+        )
     )
-)
+
+    FIXRULE.append(
+        FixRule(
+            path="QuickCharacterManager.cs",
+            fix_rules=[
+                ("room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room2.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room2.roomID));"),
+                ("room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room3.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room3.roomID));"),
+                ("room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "room4.brothelCharacters.Add(new Brothel.BrothelCharacter(character, room4.roomID));"),
+                ("currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, 0));", "currentRoom.brothelCharacters.Add(new Brothel.BrothelCharacter(character, currentRoom.roomID));")
+            ],
+        )
+    )
 
 def post_fix(directory: Path):
     

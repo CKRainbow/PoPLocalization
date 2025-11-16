@@ -97,8 +97,7 @@ def core_apply(env: UnityPy.Environment, trans_file_path: str) -> UnityPy.Enviro
     print(f"Applied translations to {modified_count} components in memory.")
     return env
 
-
-def font_asset_adoption(src_typetree: Dict, target_typetree: Dict) -> Dict:
+def font_asset_adoption_bak(src_typetree: Dict, target_typetree: Dict) -> Dict:
     """
     Adopts essential properties from an old font asset typetree to a new one.
     This preserves references and metadata within the target asset file.
@@ -108,6 +107,30 @@ def font_asset_adoption(src_typetree: Dict, target_typetree: Dict) -> Dict:
     src_typetree["hashCode"] = target_typetree["hashCode"]
     src_typetree["material"]["m_PathID"] = target_typetree["material"]["m_PathID"]
     src_typetree["materialHashCode"] = target_typetree["materialHashCode"]
+    src_typetree["m_SourceFontFileGUID"] = target_typetree["m_SourceFontFileGUID"]
+    src_typetree["m_FaceInfo"]["m_FamilyName"] = target_typetree["m_FaceInfo"]["m_FamilyName"]
+    
+    for i, old_atlas_texture in enumerate(target_typetree["m_AtlasTextures"]):
+        if i < len(src_typetree["m_AtlasTextures"]) and "m_PathID" in old_atlas_texture:
+            src_typetree["m_AtlasTextures"][i]["m_PathID"] = old_atlas_texture["m_PathID"]
+
+    if "sourceFontFileGUID" in target_typetree["m_CreationSettings"]:
+        src_typetree["m_CreationSettings"]["sourceFontFileGUID"] = target_typetree["m_CreationSettings"]["sourceFontFileGUID"]
+    if "referencedFontAssetGUID" in target_typetree["m_CreationSettings"]:
+        src_typetree["m_CreationSettings"]["referencedFontAssetGUID"] = target_typetree["m_CreationSettings"]["referencedFontAssetGUID"]
+    return src_typetree
+
+
+def font_asset_adoption(src_typetree: Dict, target_typetree: Dict) -> Dict:
+    """
+    Adopts essential properties from an old font asset typetree to a new one.
+    This preserves references and metadata within the target asset file.
+    """
+    src_typetree["m_Script"]["m_PathID"] = target_typetree["m_Script"]["m_PathID"]
+    src_typetree["m_Name"] = target_typetree["m_Name"]
+    # src_typetree["hashCode"] = target_typetree["hashCode"]
+    src_typetree["m_Material"]["m_PathID"] = target_typetree["m_Material"]["m_PathID"]
+    # src_typetree["materialHashCode"] = target_typetree["materialHashCode"]
     src_typetree["m_SourceFontFileGUID"] = target_typetree["m_SourceFontFileGUID"]
     src_typetree["m_FaceInfo"]["m_FamilyName"] = target_typetree["m_FaceInfo"]["m_FamilyName"]
     

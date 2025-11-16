@@ -1,6 +1,8 @@
 from pathlib import Path
 from dataclasses import dataclass
 
+from const import VERSION
+
 @dataclass
 class FixRule:
     path: str
@@ -16,6 +18,25 @@ FIXRULE.append(
         ],
     )
 )
+
+if VERSION >= (0, 32, 0, 0):
+    FIXRULE.append(
+        FixRule(
+            path="Assembly-CSharp.csproj",
+            fix_rules=[
+                ("<TargetFramework>net40</TargetFramework>", "<TargetFramework>netstandard2.1</TargetFramework>"),
+            ],
+        )
+    )
+    
+    FIXRULE.append(
+        FixRule(
+            path="Assembly-CSharp.csproj",
+            fix_rules=[
+                ("<Reference Include=\"System.Core\" />", "")
+            ]
+        )
+    )
 
 def decompile_fix(directory: Path):
     

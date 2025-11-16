@@ -75,6 +75,12 @@ namespace DllTranslation.Services
                 }
 
                 var parentDir = outputDir.Parent;
+                var utf8DirPath = Path.Combine(parentDir.FullName, "utf8");
+                if (Directory.Exists(utf8DirPath))
+                {
+                    Console.WriteLine($"发现已存在的临时文件夹 {utf8DirPath}，正在删除...");
+                    Directory.Delete(utf8DirPath, true);
+                }
 
                 ZipFile.ExtractToDirectory(zipPath, parentDir!.FullName);
 
@@ -82,10 +88,24 @@ namespace DllTranslation.Services
 
                 // 将最外层的utf8文件夹重命名为outputDir
 
-                var utf8Dir = new DirectoryInfo(Path.Combine(parentDir.FullName, "utf8"));
+                var utf8Dir = new DirectoryInfo(utf8DirPath);
                 if (utf8Dir.Exists)
                 {
-                    utf8Dir.MoveTo(outputDir.FullName);
+                    const int maxRetries = 5;
+                    for (int i = 0; i < maxRetries; i++)
+                    {
+                        try
+                        {
+                            utf8Dir.MoveTo(outputDir.FullName);
+                            break; // Success
+                        }
+                        catch (IOException ex) when (i < maxRetries - 1)
+                        {
+                            Console.WriteLine($"移动目录时发生 IO 异常: {ex.Message}");
+                            Console.WriteLine($"将在 200ms 后重试... (尝试次数 {i + 1}/{maxRetries})");
+                            await Task.Delay(200);
+                        }
+                    }
                 }
 
                 Console.WriteLine("成功下载并解压了翻译文件。");
