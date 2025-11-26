@@ -16,3 +16,5 @@ PoP_v版本_win.zip 为精简后的本体，如果使用上述本体下载地址
 * 精简版本：PortalsOfPhereonChineseLocalization-Windows-**PARTIAL**.zip 针对游戏已汉化的用户，汉化进行少量更新后可下载该版本覆盖（可能会有部分汉化没有更新至最新，但概率较小）
 
 汉化补丁解压后，将 PortalsOfPhereon_Data 文件夹覆盖到游戏根目录的同名文件夹即可。
+
+若原版有版本更新，请务必先下载原版，再下载汉化补丁覆盖。存档文件可在 `游戏根目录/PortalsOfPhereon_Data/saveData` 中找到，移动到新版游戏对应位置即可。
