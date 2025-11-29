@@ -2,18 +2,21 @@
 
 {TAG_INFO}
 
-本体下载地址：
+### 本体下载地址
 Windows: {WINDOWS_DOWNLOAD_URL}
 Linux: {LINUX_DOWNLOAD_URL}
 
 可加入 Discord 群组获取更多帮助：https://discord.gg/hqj7WA7PKp
 汉化交流 QQ 群：454696484
 
-如下载时出现困难，可尝试：
+### 如下载时出现困难，可尝试
 * [分流站1](https://ghproxy.link/)
 * [分流站2](https://github.moeyy.xyz/)
 
-使用方法：
+### 原版版本更新须知
+若原版有版本更新，请务必先下载原版，再下载汉化补丁覆盖。存档文件可在 `游戏根目录/PortalsOfPhereon_Data/saveData` 中找到，移动到新版游戏对应位置即可。
+
+### 使用方法
 PoP_{GAME_VERSION}_win.zip 为精简后的本体，如果使用上述本体下载地址存在问题，可下载该压缩包，解压后不能直接游玩，需要先将汉化补丁 PortalsOfPhereonChineseLocalization-Windows-**FULL**.zip 覆盖到游戏根目录。
 
 可根据需要下载对应版本汉化补丁
