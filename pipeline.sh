@@ -19,7 +19,7 @@ bash post_fix.sh
     --work-dir . \
     --input-asset ./data.unity3D \
     --dll-folder ./Managed \
-    --unity-version 2019.4.16f1 \
+    --unity-version 6000.0.60f1 \
     --tool-project-dir ./DllTranslation \
     --old-trans-dir ./old \
     --new-font-asset ./TMPfont/sharedassets0.assets \
