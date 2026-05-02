@@ -1,9 +1,9 @@
 {
-    "version": "V0.32.0.3",
+    "version": "V0.33.0.1",
     "platforms": {
         "windows": {
-            "url": "https://pixeldrain.com/api/file/o2xtZHaY?download",
-            "cache_key_suffix": "o2xtZHaY-v1"
+            "url": "https://pixeldrain.com/api/file/MyDpvWNY?download",
+            "cache_key_suffix": "MyDpvWNY-v1"
         }
     }
 }
