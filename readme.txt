@@ -2,6 +2,7 @@
 请勿在其他版本的游戏上使用，否则可能导致未知问题。
 
 本体下载地址：
+Discord 频道：https://discord.com/channels/430685832668774400/436292011218436096
 Windows: {WINDOWS_DOWNLOAD_URL}
 Linux: {LINUX_DOWNLOAD_URL}
 
