@@ -94,7 +94,8 @@ class TextProcessor(MonoBehaviourProcessor):
 class ItemControllerProcessor(MonoBehaviourProcessor):
     """Processor for ItemController scripts."""
 
-    ITEM_CATEGORIES = ["commonItems", "rareItems", "legendaryItems", "specialItems", "mythicItems"]
+    # 可见 level 2 PathID 5943 的 GameObject，或者说 PathID 31703 的 MonoBehavior
+    ITEM_CATEGORIES = ["commonItems", "rareItems", "legendaryItems", "specialItems", "specialItems2", "mythicItems"]
 
     @classmethod
     def can_handle(cls, script_name: str) -> bool:
@@ -144,6 +145,67 @@ class ItemControllerProcessor(MonoBehaviourProcessor):
                 lookup_key = f"{category}_{name}"
                 if lookup_key in translation_map:
                     item["description"] = translation_map[lookup_key]
+                    modified = True
+
+        if modified:
+            self.obj.save_typetree(self.data)
+        return modified
+
+class ImageManagerProcessor(MonoBehaviourProcessor):
+    """Processor for ImageManager scripts."""
+
+    @classmethod
+    def can_handle(cls, script_name: str) -> bool:
+        return script_name == "ImageManager"
+
+    def extract(self) -> List[ParatranzEntry]:
+        entries = []
+        npc_images = self.data.get("npcImages", [])
+        for npc_idx, npc_data in enumerate(npc_images):
+            npc_id = npc_data.get("npc")
+            image_parts = npc_data.get("imageParts", [])
+            for part_idx, part_data in enumerate(image_parts):
+                description = part_data.get("description")
+                if not description:
+                    continue
+
+                key_source = f"{self.game_object_path_id}:{self.script_name}:{self.obj.path_id}:npcImages:{npc_id}:imageParts:{description}"
+                key = generate_hash(key_source)
+                context = f"GameObjectID: {self.game_object_path_id}\nPathID: {self.obj.path_id}\nScript: {self.script_name}\nJsonPath: npcImages_{npc_id}_imageParts_{part_idx}"
+
+                entries.append(ParatranzEntry(
+                    key=key,
+                    original=description,
+                    translation="",
+                    stage=0,
+                    context=context,
+                ))
+        return entries
+
+    def apply(self, translations: List[Dict]) -> bool:
+        if not translations:
+            return False
+
+        translation_map = {
+            re.search(r"JsonPath:\s*(.+)", entry["context"]).group(1): entry["translation"]
+            for entry in translations if entry.get("translation")
+        }
+
+        if not translation_map:
+            return False
+
+        modified = False
+        npc_images = self.data.get("npcImages", [])
+        for npc_idx, npc_data in enumerate(npc_images):
+            npc_id = npc_data.get("npc")
+            image_parts = npc_data.get("imageParts", [])
+            for part_idx, part_data in enumerate(image_parts):
+                if not part_data.get("description"):
+                    continue
+
+                lookup_key = f"npcImages_{npc_id}_imageParts_{part_idx}"
+                if lookup_key in translation_map:
+                    part_data["description"] = translation_map[lookup_key]
                     modified = True
 
         if modified:
@@ -208,6 +270,7 @@ class DropdownProcessor(MonoBehaviourProcessor):
 PROCESSOR_CLASSES: List[Type[MonoBehaviourProcessor]] = [
     ItemControllerProcessor,
     DropdownProcessor,
+    ImageManagerProcessor,
     TextProcessor,  # TextProcessor should be last as it's a bit generic
 ]
 
