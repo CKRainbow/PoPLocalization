@@ -338,6 +338,7 @@ __marimo__/
 
 # Project-specific
 decompiled/
+decompiled_backup/
 *_unpacked/
 font_exchange/
 /Managed/
