@@ -120,6 +120,10 @@ PortalsOfPhereonChineseLocalization.zip
 <details>
 <summary>点击展开</summary>
 
+- 2026.7.4
+  - 发布 `v0.34.0.1-chs-1.0.0a` 版
+    - 更新至 `v0.34.0.1`
+
 - 2026.5.25
   - 发布 `v0.33.1.0-chs-2.0.0a` 版
     - 更新至 `v0.33.1.0`
