@@ -33,10 +33,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.dotnet/tools
-        key: ${{ runner.os }}-dotnet-tools-ilspycmd-9.1.0.7988
+        key: ${{ runner.os }}-dotnet-tools-ilspycmd-10.1.0.8386
 
     - name: Install ilspycmd
-      run: dotnet tool install --global ilspycmd --version 9.1.0.7988
+      run: dotnet tool install --global ilspycmd --version 10.1.0.8386
 
     - name: Cache NuGet packages
       uses: actions/cache@v4
