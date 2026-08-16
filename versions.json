@@ -1,9 +1,9 @@
 {
-    "version": "V0.34.0.1",
+    "version": "V0.35.0.0",
     "platforms": {
         "windows": {
-            "url": "https://pixeldrain.com/api/file/a6tZr5is?download",
-            "cache_key_suffix": "a6tZr5is-v1"
+            "url": "https://pixeldrain.com/api/file/A5nncuCb?download",
+            "cache_key_suffix": "A5nncuCb-v1"
         }
     }
 }
